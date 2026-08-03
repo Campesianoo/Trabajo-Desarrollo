@@ -5,7 +5,7 @@ const PORT = process.env.PORT || 3000;
 
 sequelize.authenticate()
   .then(() => {
-    console.log('Conectado a MySQL');
+    console.log('Conectado a PostgreSQL');
     return sequelize.sync(); // crea tablas si no existen
   })
   .then(() => {

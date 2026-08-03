@@ -172,3 +172,22 @@ Durante la evaluación de cada entrega se considerarán:
 ## 6. FAQ
 
 En la sección de [FAQ](FAQ.md) podrán encontrar respuestas a las consultas más frecuentes que se van realizando.
+
+## 7. Configuración del Backend
+
+El backend usa **Sequelize** con **PostgreSQL** (Supabase).
+
+1. Instalar dependencias: `cd backend && pnpm install`
+2. Copiar `backend/.env.example` a `backend/.env` y completar las variables:
+
+| Variable | Descripción |
+| --- | --- |
+| `DATABASE_URL` | Connection string de Supabase (recomendado) |
+| `DB_NAME` / `DB_USER` / `DB_PASS` / `DB_HOST` / `DB_PORT` | Alternativa por variables individuales |
+
+3. Ejecutar: `pnpm start` o `pnpm dev`
+
+Ejemplo de `.env`:
+```
+DATABASE_URL=postgresql://postgres.xxxx:password@aws-0-xx.pooler.supabase.com:6543/postgres
+```
