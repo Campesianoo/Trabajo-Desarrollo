@@ -3,8 +3,8 @@ const Profesor = require('../models/profesor');
 // GET /profesores - trae todos
 const getProfesor = async (req, res) => {
   try {
-    const profesores = await Producto.find();
-    res.json(productos);
+    const profesores = await Profesor.findAll();
+    res.json(profesores);
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener profesores' });
   }
@@ -13,9 +13,9 @@ const getProfesor = async (req, res) => {
 // GET trae un profesor por dni
 const getProfesorByPk = async (req, res) => {
   try {
-    const profesor = await Producto.findByPk(req.params.dni);
+    const profesor = await Profesor.findByPk(req.params.dni);
     if (!profesor) return res.status(404).json({ message: 'No encontrado' });
-    res.json(producto);
+    res.json(profesor);
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener profesor' });
   }
@@ -28,7 +28,7 @@ const createProfesor = async (req, res) => {
     const guardado = await nuevo.save();
     res.status(201).json(guardado);
   } catch (error) {
-    res.status(400).json({ message: 'Error al crear producto' });
+    res.status(400).json({ message: 'Error al crear profesor' });
   }
 };
 
@@ -36,7 +36,7 @@ const createProfesor = async (req, res) => {
 const updateProfesor = async (req, res) => {
   try {
     const profesor = await Profesor.findByPk(req.params.dni); //busca
-    if (!persona) return res.status(404).json({ message: 'No encontrado' });
+    if (!profesor) return res.status(404).json({ message: 'No encontrado' });
     await profesor.update(req.body); //actualiza
     res.json(profesor);
   } catch (error) {
@@ -50,7 +50,7 @@ const deleteProfesor = async (req, res) => {
     const profesor = await Profesor.findByPk(req.params.dni); //busca
     if (!profesor) return res.status(404).json({ message: 'No encontrado' });
     await profesor.destroy(); //elimina
-    res.json({ message: 'Persona eliminada' });
+    res.json({ message: 'Profesor eliminado' });
   } catch (error) {
     res.status(500).json({ message: 'Error al eliminar' });
   }
