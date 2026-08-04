@@ -6,7 +6,8 @@ const getProfesor = async (req, res) => {
     const profesores = await Profesor.findAll();
     res.json(profesores);
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener profesores' });
+    console.error(error);
+    res.status(500).json({ message: 'Error al obtener profesores', error: error.message });
   }
 };
 
@@ -17,22 +18,23 @@ const getProfesorByPk = async (req, res) => {
     if (!profesor) return res.status(404).json({ message: 'No encontrado' });
     res.json(profesor);
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener profesor' });
+    console.error(error);
+    res.status(500).json({ message: 'Error al obtener profesor', error: error.message });
   }
 };
 
 // POST - crea nuevo profesor
 const createProfesor = async (req, res) => {
   try {
-    const nuevo = new Profesor(req.body);
-    const guardado = await nuevo.save();
-    res.status(201).json(guardado);
+    const nuevo = await Profesor.create(req.body);
+    res.status(201).json(nuevo);
   } catch (error) {
-    res.status(400).json({ message: 'Error al crear profesor' });
+    console.error(error);
+    res.status(400).json({ message: 'Error al crear profesor', error: error.message });
   }
 };
 
-// PUT edita un profesor eistentente por dni
+// PUT edita un profesor existente por dni
 const updateProfesor = async (req, res) => {
   try {
     const profesor = await Profesor.findByPk(req.params.dni); //busca
@@ -40,7 +42,8 @@ const updateProfesor = async (req, res) => {
     await profesor.update(req.body); //actualiza
     res.json(profesor);
   } catch (error) {
-    res.status(400).json({ message: 'Error al actualizar' });
+    console.error(error);
+    res.status(400).json({ message: 'Error al actualizar', error: error.message });
   }
 };
 
@@ -52,7 +55,8 @@ const deleteProfesor = async (req, res) => {
     await profesor.destroy(); //elimina
     res.json({ message: 'Profesor eliminado' });
   } catch (error) {
-    res.status(500).json({ message: 'Error al eliminar' });
+    console.error(error);
+    res.status(500).json({ message: 'Error al eliminar', error: error.message });
   }
 };
 

@@ -14,14 +14,17 @@ const Profesor = sequelize.define('Profesor', {
     type: DataTypes.STRING,
     allowNull: false
   },
-  teléfono: {
-    type: DataTypes.INTEGER,
+  telefono: {
+    type: DataTypes.STRING,
     allowNull: false
   },
   email: {
     type: DataTypes.STRING,
     allowNull: false
   }
+}, {
+  tableName: 'Profesores',
+  freezeTableName: true
 });
 
 module.exports = Profesor;
