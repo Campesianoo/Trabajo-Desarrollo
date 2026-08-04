@@ -5,7 +5,13 @@ info:
 
 http:
   method: PUT
-  url: http://localhost:3000/api/profesores
+  url: http://localhost:3000/api/profesores/46537620
+  body:
+    type: json
+    data: |-
+      {
+        "telefono":"3413182564"
+      }
   auth: inherit
 
 settings:

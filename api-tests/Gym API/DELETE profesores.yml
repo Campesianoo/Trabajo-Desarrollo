@@ -5,7 +5,7 @@ info:
 
 http:
   method: DELETE
-  url: http://localhost:3000/api/profesores
+  url: http://localhost:3000/api/profesores/35123456
   auth: inherit
 
 settings:

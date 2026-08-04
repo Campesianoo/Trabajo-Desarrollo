@@ -5,16 +5,13 @@ info:
 
 http:
   method: POST
-  url: http://localhost:3000/api/profesores
+  url: http://localhost:3000/api/especialidades
   body:
     type: json
     data: |
       {
-        "dni": 46537620,
-        "nombre": "Ian",
-        "apellido": "Kasperczak",
-        "telefono": 3333333,
-        "email": "iankasperczak@gmail.com"
+        "id": 3,
+        "nombre": "Aura master"
       }
   auth: inherit
 

@@ -5,12 +5,12 @@ info:
 
 http:
   method: PUT
-  url: http://localhost:3000/api/profesores/46537620
+  url: http://localhost:3000/api/especialidades/3
   body:
     type: json
     data: |-
       {
-        "telefono":"3413182564"
+        "nombre": "Boxeo"
       }
   auth: inherit
 
