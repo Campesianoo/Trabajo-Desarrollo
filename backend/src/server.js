@@ -1,5 +1,6 @@
 const app = require('./app');
 const sequelize = require('./config/database');
+require('./models/associations'); // define las relaciones N:M antes de sincronizar
 
 const PORT = process.env.PORT || 3000;
 

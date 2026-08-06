@@ -1,9 +1,19 @@
 const Profesor = require('../models/profesor');
+const Especialidad = require('../models/especialidad');
+const ProfesorEspecialidad = require('../models/profesorEspecialidad');
+
+// config. común para incluir las especialidades de un profesor
+const especialidadesInclude = {
+  model: Especialidad,
+  as: 'especialidades',
+  attributes: [['id', 'idEspecialidad'], 'nombre'],
+  through: { attributes: [] }
+};
 
 // GET /profesores - trae todos
 const getProfesor = async (req, res) => {
   try {
-    const profesores = await Profesor.findAll();
+    const profesores = await Profesor.findAll({ include: especialidadesInclude });
     res.json(profesores);
   } catch (error) {
     console.error(error);
@@ -14,7 +24,7 @@ const getProfesor = async (req, res) => {
 // GET trae un profesor por dni
 const getProfesorByPk = async (req, res) => {
   try {
-    const profesor = await Profesor.findByPk(req.params.dni);
+    const profesor = await Profesor.findByPk(req.params.dni, { include: especialidadesInclude });
     if (!profesor) return res.status(404).json({ message: 'No encontrado' });
     res.json(profesor);
   } catch (error) {
@@ -60,10 +70,50 @@ const deleteProfesor = async (req, res) => {
   }
 };
 
+// POST asigna una especialidad a un profesor
+const asignarEspecialidad = async (req, res) => {
+  try {
+    const { idEspecialidad } = req.body;
+    const profesor = await Profesor.findByPk(req.params.dni);
+    if (!profesor) return res.status(404).json({ message: 'Profesor no encontrado' });
+    const especialidad = await Especialidad.findByPk(idEspecialidad);
+    if (!especialidad) return res.status(404).json({ message: 'Especialidad no encontrada' });
+
+    const existe = await ProfesorEspecialidad.findOne({
+      where: { dniProfesor: req.params.dni, idEspecialidad }
+    });
+    if (existe) return res.status(409).json({ message: 'La relación ya existe' });
+
+    await ProfesorEspecialidad.create({ dniProfesor: req.params.dni, idEspecialidad });
+    res.status(201).json({ message: 'Especialidad asignada al profesor' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error al asignar especialidad', error: error.message });
+  }
+};
+
+// DELETE quita una especialidad de un profesor
+const quitarEspecialidad = async (req, res) => {
+  try {
+    const { dni, idEspecialidad } = req.params;
+    const relacion = await ProfesorEspecialidad.findOne({
+      where: { dniProfesor: dni, idEspecialidad }
+    });
+    if (!relacion) return res.status(404).json({ message: 'Relación no encontrada' });
+    await relacion.destroy(); //elimina solo la relación
+    res.json({ message: 'Especialidad quitada del profesor' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error al quitar especialidad', error: error.message });
+  }
+};
+
 module.exports = {
   getProfesor,
   getProfesorByPk,
   createProfesor,
   updateProfesor,
-  deleteProfesor
+  deleteProfesor,
+  asignarEspecialidad,
+  quitarEspecialidad
 }; 

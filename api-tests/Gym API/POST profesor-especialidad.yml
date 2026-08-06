@@ -1,16 +1,16 @@
 info:
-  name: PUT profesores
+  name: POST profesor-especialidad
   type: http
-  seq: 4
+  seq: 9
 
 http:
-  method: PUT
-  url: http://localhost:3000/api/profesores/46537620
+  method: POST
+  url: http://localhost:3000/api/profesores/46537620/especialidades
   body:
     type: json
     data: |-
       {
-        
+        "idEspecialidad": 1
       }
   auth: inherit
 
