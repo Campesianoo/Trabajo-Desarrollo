@@ -223,4 +223,13 @@ No hay registro público: las cuentas las crea un admin desde `POST /api/usuario
 - `FRONTEND_ORIGIN` en el `.env` del backend tiene que ser exactamente el origen del frontend (ej. `http://localhost:5173`). Cualquier otro origen recibe `403` en los métodos que modifican datos.
 - Todas las requests tienen que enviar la cookie: `fetch(url, { credentials: 'include' })` (o `withCredentials: true` en Axios/Angular HttpClient).
 - Al cargar la app, llamar a `GET /api/auth/me` para saber si hay sesión: `401` significa que no la hay o que expiró.
-- Si en el deploy frontend y backend quedan en dominios distintos, usar `COOKIE_SAMESITE=none` y HTTPS.
+- El frontend no llama al backend directo: pide todo a su propio origen en `/api` y Vite (en local) o Vercel (en producción, ver `vercel.json` del frontend) lo reenvían. Así la cookie es del mismo sitio y se puede dejar `COOKIE_SAMESITE=lax`. Si se llamara directo de `vercel.app` a `onrender.com`, la cookie sería de terceros y Safari la bloquearía.
+
+### Variables en el deploy (Render)
+| Variable | Valor |
+| --- | --- |
+| `NODE_ENV` | `production` |
+| `JWT_SECRET` | uno nuevo, distinto del de desarrollo |
+| `FRONTEND_ORIGIN` | la URL del frontend en Vercel, ej. `https://mi-app.vercel.app` |
+| `COOKIE_SAMESITE` | `lax` |
+| `TRUST_PROXY` | cantidad de proxies delante del server. Hay dos (Vercel y Render), así que probablemente `2`. Verificarlo: si queda mal, el límite de intentos de login se aplica a todos los usuarios juntos. |
