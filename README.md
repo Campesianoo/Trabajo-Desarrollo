@@ -191,3 +191,36 @@ Ejemplo de `.env`:
 ```
 DATABASE_URL=postgresql://postgres.xxxx:password@aws-0-xx.pooler.supabase.com:6543/postgres
 ```
+
+## 8. Autenticación
+
+El backend usa login propio con **JWT guardado en una cookie httpOnly** (JavaScript no puede leerla, así que un XSS no puede robar la sesión). Las contraseñas se guardan hasheadas con bcrypt.
+
+### Roles
+| Rol | Permisos actuales |
+| --- | --- |
+| `admin` | Todo: gestión de usuarios, alta/baja/modificación de profesores y especialidades |
+| `profesor` | Consultar profesores y especialidades (su cuenta está vinculada a un profesor por `dniProfesor`) |
+| `cliente` | Consultar profesores y especialidades |
+
+No hay registro público: las cuentas las crea un admin desde `POST /api/usuarios`.
+
+### Crear el primer admin
+1. En `backend/.env` completar `JWT_SECRET` (ver `.env.example`), `ADMIN_EMAIL` y `ADMIN_PASSWORD` (mínimo 8 caracteres).
+2. Ejecutar `pnpm run create-admin`.
+3. Borrar `ADMIN_PASSWORD` del `.env`.
+
+### Endpoints
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| POST | `/api/auth/login` `{ email, password }` | Público (máx. 10 intentos fallidos cada 15 min) |
+| POST | `/api/auth/logout` | Público |
+| GET | `/api/auth/me` | Autenticado |
+| PUT | `/api/auth/password` `{ passwordActual, passwordNueva }` | Autenticado |
+| GET/POST/PUT/DELETE | `/api/usuarios` | Admin |
+
+### Integración con el frontend
+- `FRONTEND_ORIGIN` en el `.env` del backend tiene que ser exactamente el origen del frontend (ej. `http://localhost:5173`). Cualquier otro origen recibe `403` en los métodos que modifican datos.
+- Todas las requests tienen que enviar la cookie: `fetch(url, { credentials: 'include' })` (o `withCredentials: true` en Axios/Angular HttpClient).
+- Al cargar la app, llamar a `GET /api/auth/me` para saber si hay sesión: `401` significa que no la hay o que expiró.
+- Si en el deploy frontend y backend quedan en dominios distintos, usar `COOKIE_SAMESITE=none` y HTTPS.

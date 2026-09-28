@@ -97,9 +97,10 @@ const deleteProfesor = async (req, res) => {
     res.json({ message: 'Profesor eliminado' });
   } catch (error) {
     if (error.name === 'SequelizeForeignKeyConstraintError') {
-      return res
-        .status(409)
-        .json({ message: 'No se puede eliminar: el profesor tiene especialidades asignadas' });
+      return res.status(409).json({
+        message:
+          'No se puede eliminar: el profesor tiene registros asociados (especialidades o cuenta de usuario)'
+      });
     }
     sendError(res, 500, 'Error al eliminar', error);
   }
