@@ -1,4 +1,5 @@
 const Especialidad = require('../models/especialidad');
+const { toPositiveInt, sendError } = require('../utils/http');
 
 // GET /especialidades - trae todas
 const getEspecialidades = async (req, res) => {
@@ -6,57 +7,74 @@ const getEspecialidades = async (req, res) => {
     const especialidades = await Especialidad.findAll();
     res.json(especialidades);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error al obtener especialidades', error: error.message });
+    sendError(res, 500, 'Error al obtener especialidades', error);
   }
 };
 
 // GET trae una especialidad por id
 const getEspecialidadByPk = async (req, res) => {
   try {
-    const especialidad = await Especialidad.findByPk(req.params.id);
+    const id = toPositiveInt(req.params.id);
+    if (!id) return res.status(400).json({ message: 'id inválido' });
+
+    const especialidad = await Especialidad.findByPk(id);
     if (!especialidad) return res.status(404).json({ message: 'No encontrado' });
     res.json(especialidad);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error al obtener especialidad', error: error.message });
+    sendError(res, 500, 'Error al obtener especialidad', error);
   }
 };
 
 // POST - crea nueva especialidad
 const createEspecialidad = async (req, res) => {
   try {
-    const nueva = await Especialidad.create(req.body);
+    const { nombre } = req.body;
+    if (!nombre || typeof nombre !== 'string' || !nombre.trim()) {
+      return res.status(400).json({ message: 'nombre es obligatorio' });
+    }
+
+    const nueva = await Especialidad.create({ nombre: nombre.trim() });
     res.status(201).json(nueva);
   } catch (error) {
-    console.error(error);
-    res.status(400).json({ message: 'Error al crear especialidad', error: error.message });
+    sendError(res, 400, 'Error al crear especialidad', error);
   }
 };
 
 // PUT edita una especialidad existente por id
 const updateEspecialidad = async (req, res) => {
   try {
-    const especialidad = await Especialidad.findByPk(req.params.id); //busca
+    const id = toPositiveInt(req.params.id);
+    if (!id) return res.status(400).json({ message: 'id inválido' });
+
+    const especialidad = await Especialidad.findByPk(id); //busca
     if (!especialidad) return res.status(404).json({ message: 'No encontrado' });
-    await especialidad.update(req.body); //actualiza
+
+    const { id: _id, ...datos } = req.body; // la PK no se puede modificar por este endpoint
+    await especialidad.update(datos); //actualiza
     res.json(especialidad);
   } catch (error) {
-    console.error(error);
-    res.status(400).json({ message: 'Error al actualizar', error: error.message });
+    sendError(res, 400, 'Error al actualizar', error);
   }
 };
 
 // DELETE elimina una especialidad por id
 const deleteEspecialidad = async (req, res) => {
   try {
-    const especialidad = await Especialidad.findByPk(req.params.id); //busca
+    const id = toPositiveInt(req.params.id);
+    if (!id) return res.status(400).json({ message: 'id inválido' });
+
+    const especialidad = await Especialidad.findByPk(id); //busca
     if (!especialidad) return res.status(404).json({ message: 'No encontrado' });
+
     await especialidad.destroy(); //elimina
     res.json({ message: 'Especialidad eliminada' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error al eliminar', error: error.message });
+    if (error.name === 'SequelizeForeignKeyConstraintError') {
+      return res
+        .status(409)
+        .json({ message: 'No se puede eliminar: la especialidad tiene profesores asignados' });
+    }
+    sendError(res, 500, 'Error al eliminar', error);
   }
 };
 

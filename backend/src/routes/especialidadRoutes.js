@@ -8,10 +8,10 @@ const {
   deleteEspecialidad
 } = require('../controllers/especialidadController');
 
-router.get('/',            getEspecialidades);
-router.get('/:id',          getEspecialidadByPk);
-router.post('/',           createEspecialidad);
-router.put('/:id',          updateEspecialidad);
-router.delete('/:id',       deleteEspecialidad);
+router.get('/', getEspecialidades);
+router.get('/:id', getEspecialidadByPk);
+router.post('/', createEspecialidad);
+router.put('/:id', updateEspecialidad);
+router.delete('/:id', deleteEspecialidad);
 
 module.exports = router;

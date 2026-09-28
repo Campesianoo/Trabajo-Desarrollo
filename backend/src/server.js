@@ -4,7 +4,8 @@ require('./models/associations'); // define las relaciones N:M antes de sincroni
 
 const PORT = process.env.PORT || 3000;
 
-sequelize.authenticate()
+sequelize
+  .authenticate()
   .then(() => {
     console.log('Conectado a PostgreSQL');
     return sequelize.sync(); // crea tablas si no existen
