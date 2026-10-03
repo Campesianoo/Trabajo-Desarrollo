@@ -2,6 +2,7 @@ const Profesor = require('./profesor');
 const Especialidad = require('./especialidad');
 const ProfesorEspecialidad = require('./profesorEspecialidad');
 const Usuario = require('./usuario');
+const Cliente = require('./cliente');
 
 Profesor.belongsToMany(Especialidad, {
   through: ProfesorEspecialidad,
@@ -21,4 +22,8 @@ Especialidad.belongsToMany(Profesor, {
 Usuario.belongsTo(Profesor, { foreignKey: 'dniProfesor', as: 'profesor', onDelete: 'RESTRICT' });
 Profesor.hasOne(Usuario, { foreignKey: 'dniProfesor', as: 'usuario', onDelete: 'RESTRICT' });
 
-module.exports = { Profesor, Especialidad, ProfesorEspecialidad, Usuario };
+// Cada cliente tiene exactamente una cuenta; la cuenta no se puede borrar mientras exista el cliente
+Cliente.belongsTo(Usuario, { foreignKey: 'idUsuario', as: 'usuario', onDelete: 'RESTRICT' });
+Usuario.hasOne(Cliente, { foreignKey: 'idUsuario', as: 'cliente', onDelete: 'RESTRICT' });
+
+module.exports = { Profesor, Especialidad, ProfesorEspecialidad, Usuario, Cliente };

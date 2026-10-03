@@ -201,9 +201,9 @@ El backend usa login propio con **JWT guardado en una cookie httpOnly** (JavaScr
 | --- | --- |
 | `admin` | Todo: gestión de usuarios, alta/baja/modificación de profesores y especialidades |
 | `profesor` | Consultar profesores y especialidades (su cuenta está vinculada a un profesor por `dniProfesor`) |
-| `cliente` | Consultar profesores y especialidades |
+| `cliente` | Consultar profesores y especialidades (su cuenta se crea junto con su registro de cliente) |
 
-No hay registro público: las cuentas las crea un admin desde `POST /api/usuarios`.
+No hay registro público: las cuentas las crea un admin. Las de admin y profesor desde `POST /api/usuarios`; las de clientes desde `POST /api/clientes`, que crea el cliente y su cuenta en una sola operación.
 
 ### Crear el primer admin
 1. En `backend/.env` completar `JWT_SECRET` (ver `.env.example`), `ADMIN_EMAIL` y `ADMIN_PASSWORD` (mínimo 8 caracteres).
@@ -218,6 +218,10 @@ No hay registro público: las cuentas las crea un admin desde `POST /api/usuario
 | GET | `/api/auth/me` | Autenticado |
 | PUT | `/api/auth/password` `{ passwordActual, passwordNueva }` | Autenticado |
 | GET/POST/PUT/DELETE | `/api/usuarios` | Admin |
+| GET | `/api/clientes`, `/api/clientes/:dni` | Admin |
+| POST | `/api/clientes` `{ dni, nombre, apellido, telefono, email, password }` | Admin |
+| PUT | `/api/clientes/:dni` `{ nombre?, apellido?, telefono?, email?, password?, activo? }` | Admin |
+| DELETE | `/api/clientes/:dni` (borra también su cuenta) | Admin |
 
 ### Integración con el frontend
 - `FRONTEND_ORIGIN` en el `.env` del backend tiene que ser exactamente el origen del frontend (ej. `http://localhost:5173`). Cualquier otro origen recibe `403` en los métodos que modifican datos.

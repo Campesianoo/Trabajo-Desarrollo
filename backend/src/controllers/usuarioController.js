@@ -4,6 +4,9 @@ const { setAuthCookie } = require('../config/auth');
 const { validatePassword, hashPassword } = require('../utils/password');
 const { toPositiveInt, isValidEmail, sendError } = require('../utils/http');
 
+// Un usuario cliente siempre va junto con su registro de Cliente: se crean y borran desde ahí
+const MENSAJE_CLIENTES = 'Las cuentas de clientes se gestionan desde /api/clientes';
+
 const manejarErrorDeGuardado = (res, error, mensaje) => {
   if (error.name === 'SequelizeUniqueConstraintError') {
     return res
@@ -56,6 +59,7 @@ const createUsuario = async (req, res) => {
     const errorPassword = validatePassword(password);
     if (errorPassword) return res.status(400).json({ message: errorPassword });
     if (!Usuario.ROLES.includes(rol)) return res.status(400).json({ message: 'rol inválido' });
+    if (rol === 'cliente') return res.status(400).json({ message: MENSAJE_CLIENTES });
 
     let dni = null;
     if (rol === 'profesor') {
@@ -96,6 +100,9 @@ const updateUsuario = async (req, res) => {
       if (!Usuario.ROLES.includes(rol)) return res.status(400).json({ message: 'rol inválido' });
       if (esElMismo && rol !== 'admin') {
         return res.status(400).json({ message: 'No podés quitarte el rol de admin' });
+      }
+      if (rol !== usuario.rol && (rol === 'cliente' || usuario.rol === 'cliente')) {
+        return res.status(400).json({ message: MENSAJE_CLIENTES });
       }
       cambios.rol = rol;
     }
@@ -161,10 +168,16 @@ const deleteUsuario = async (req, res) => {
 
     const usuario = await Usuario.findByPk(id);
     if (!usuario) return res.status(404).json({ message: 'No encontrado' });
+    if (usuario.rol === 'cliente') return res.status(400).json({ message: MENSAJE_CLIENTES });
 
     await usuario.destroy();
     res.json({ message: 'Usuario eliminado' });
   } catch (error) {
+    if (error.name === 'SequelizeForeignKeyConstraintError') {
+      return res
+        .status(409)
+        .json({ message: 'No se puede eliminar: el usuario tiene registros asociados' });
+    }
     sendError(res, 500, 'Error al eliminar usuario', error);
   }
 };
