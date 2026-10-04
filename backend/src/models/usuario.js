@@ -39,6 +39,13 @@ const Usuario = sequelize.define(
       allowNull: false,
       defaultValue: 0
     },
+    // Las cuentas que crea un admin arrancan con una contraseña que el admin conoce (por ej. el DNI).
+    // No bloquea nada: el frontend lo usa para recordarle al usuario que elija la suya
+    debeCambiarPassword: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    },
     dniProfesor: {
       type: DataTypes.INTEGER,
       allowNull: true,

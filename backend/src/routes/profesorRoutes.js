@@ -4,6 +4,7 @@ const {
   getProfesor,
   getProfesorByPk,
   createProfesor,
+  crearCuentaProfesor,
   updateProfesor,
   deleteProfesor,
   asignarEspecialidad,
@@ -20,6 +21,9 @@ router.get('/:dni', getProfesorByPk);
 router.post('/', soloAdmin, createProfesor);
 router.put('/:dni', soloAdmin, updateProfesor);
 router.delete('/:dni', soloAdmin, deleteProfesor);
+
+// cuenta de acceso del profesor (contraseña inicial: su DNI)
+router.post('/:dni/cuenta', soloAdmin, crearCuentaProfesor);
 
 // relación N:M Profesor-Especialidad
 router.post('/:dni/especialidades', soloAdmin, asignarEspecialidad);

@@ -1,9 +1,13 @@
 const sequelize = require('../config/database');
 const { Cliente, Usuario } = require('../models/associations');
-const { validatePassword, hashPassword } = require('../utils/password');
+const { validatePassword, hashPassword, hashPasswordInicial } = require('../utils/password');
 const { toPositiveInt, isValidEmail, sendError } = require('../utils/http');
 
-const incluirUsuario = { model: Usuario, as: 'usuario', attributes: ['id', 'email', 'activo'] };
+const incluirUsuario = {
+  model: Usuario,
+  as: 'usuario',
+  attributes: ['id', 'email', 'activo', 'debeCambiarPassword']
+};
 
 const aRespuesta = (cliente, usuario = cliente.usuario) => ({
   dni: cliente.dni,
@@ -11,7 +15,9 @@ const aRespuesta = (cliente, usuario = cliente.usuario) => ({
   apellido: cliente.apellido,
   telefono: cliente.telefono,
   email: usuario.email,
-  activo: usuario.activo
+  activo: usuario.activo,
+  // true mientras el cliente no haya entrado por primera vez y elegido su contraseña
+  debeCambiarPassword: usuario.debeCambiarPassword
 });
 
 const textoValido = (valor) => typeof valor === 'string' && valor.trim().length > 0;
@@ -85,8 +91,12 @@ const createCliente = async (req, res) => {
       return res.status(400).json({ message: 'nombre, apellido y telefono son obligatorios' });
     }
     if (!isValidEmail(email)) return res.status(400).json({ message: 'email inválido' });
-    const errorPassword = validatePassword(password);
-    if (errorPassword) return res.status(400).json({ message: errorPassword });
+    // Sin contraseña, la cuenta arranca con el DNI. En los dos casos la conoce el admin,
+    // así que la cuenta queda marcada para que el cliente elija la suya
+    if (password !== undefined && password !== '') {
+      const errorPassword = validatePassword(password);
+      if (errorPassword) return res.status(400).json({ message: errorPassword });
+    }
 
     const emailNorm = normalizarEmail(email);
     if (await Cliente.findByPk(dniNum)) {
@@ -97,10 +107,12 @@ const createCliente = async (req, res) => {
     }
 
     // El hash se calcula antes de abrir la transacción para no tenerla abierta de más
-    const passwordHash = await hashPassword(password);
+    const passwordHash = password
+      ? await hashPassword(password)
+      : await hashPasswordInicial(dniNum);
     const { cliente, usuario } = await sequelize.transaction(async (transaction) => {
       const usuario = await Usuario.create(
-        { email: emailNorm, passwordHash, rol: 'cliente' },
+        { email: emailNorm, passwordHash, rol: 'cliente', debeCambiarPassword: true },
         { transaction }
       );
       const cliente = await Cliente.create(
@@ -171,8 +183,10 @@ const updateCliente = async (req, res) => {
       const errorPassword = validatePassword(password);
       if (errorPassword) return res.status(400).json({ message: errorPassword });
       cambiosUsuario.passwordHash = await hashPassword(password);
-      // Una contraseña nueva cierra las sesiones abiertas del cliente
+      // Una contraseña nueva cierra las sesiones abiertas del cliente, y como la eligió el admin,
+      // se le vuelve a recordar al cliente que elija la suya
       cambiosUsuario.tokenVersion = usuario.tokenVersion + 1;
+      cambiosUsuario.debeCambiarPassword = true;
     }
 
     await sequelize.transaction(async (transaction) => {

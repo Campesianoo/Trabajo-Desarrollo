@@ -75,7 +75,9 @@ const createUsuario = async (req, res) => {
       email,
       passwordHash: await hashPassword(password),
       rol,
-      dniProfesor: dni
+      dniProfesor: dni,
+      // La contraseña la eligió el admin: se le recuerda al usuario que elija la suya
+      debeCambiarPassword: true
     });
     res.status(201).json(nuevo);
   } catch (error) {
@@ -141,6 +143,8 @@ const updateUsuario = async (req, res) => {
       const errorPassword = validatePassword(password);
       if (errorPassword) return res.status(400).json({ message: errorPassword });
       cambios.passwordHash = await hashPassword(password);
+      // Si el admin le pone una contraseña a otro usuario, se le recuerda que elija la suya
+      cambios.debeCambiarPassword = !esElMismo;
     }
 
     // Cambio de contraseña o de rol: se invalidan las sesiones abiertas de ese usuario
