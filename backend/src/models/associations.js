@@ -3,6 +3,7 @@ const Especialidad = require('./especialidad');
 const ProfesorEspecialidad = require('./profesorEspecialidad');
 const Usuario = require('./usuario');
 const Rutina = require('./rutina');
+const RutinaEjercicio = require('./rutinaEjercicio');
 
 Profesor.belongsToMany(Especialidad, {
   through: ProfesorEspecialidad,
@@ -25,4 +26,11 @@ Profesor.hasOne(Usuario, { foreignKey: 'dniProfesor', as: 'usuario', onDelete: '
 Rutina.belongsTo(Profesor, { foreignKey: 'dniProfesor', as: 'profesor' });
 Profesor.hasMany(Rutina, { foreignKey: 'dniProfesor', as: 'rutinas' });
 
-module.exports = { Profesor, Especialidad, ProfesorEspecialidad, Usuario, Rutina };
+Rutina.hasMany(RutinaEjercicio, {
+  foreignKey: 'idRutina',
+  as: 'ejercicios',
+  onDelete: 'CASCADE'
+});
+RutinaEjercicio.belongsTo(Rutina, { foreignKey: 'idRutina', as: 'rutina' });
+
+module.exports = { Profesor, Especialidad, ProfesorEspecialidad, Usuario, Rutina, RutinaEjercicio };
