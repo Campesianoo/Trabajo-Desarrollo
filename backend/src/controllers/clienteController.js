@@ -14,8 +14,13 @@ const getClientes = async (req, res) => {
 // GET /api/clientes/:dni - Obtener un cliente específico por DNI
 const getClienteByDni = async (req, res) => {
   try {
-    const { dni } = req.params;
-    const cliente = await Cliente.findOne({ where: { dni } });
+    const dniNum = Number(req.params.dni);
+
+    if (isNaN(dniNum)) {
+      return sendError(res, 400, 'El DNI debe ser un número entero válido');
+    }
+
+    const cliente = await Cliente.findByPk(dniNum);
 
     if (!cliente) {
       return sendError(res, 404, 'Cliente no encontrado');
@@ -36,18 +41,23 @@ const createCliente = async (req, res) => {
       return sendError(res, 400, 'El DNI, nombre y apellido son obligatorios');
     }
 
-    const existe = await Cliente.findOne({ where: { dni } });
+    const dniNum = Number(dni);
+    if (isNaN(dniNum)) {
+      return sendError(res, 400, 'El DNI debe ser un número entero válido');
+    }
+
+    const existe = await Cliente.findByPk(dniNum);
     if (existe) {
       return sendError(res, 400, 'Ya existe un cliente registrado con ese DNI');
     }
 
     const nuevoCliente = await Cliente.create({
-      dni: String(dni).trim(),
+      dni: dniNum,
       nombre: nombre.trim(),
       apellido: apellido.trim(),
       telefono: telefono ? String(telefono).trim() : null,
       email: email ? email.trim() : null,
-      idUsuario: idUsuario || null,
+      idUsuario: idUsuario ? Number(idUsuario) : null,
     });
 
     res.status(201).json(nuevoCliente);
@@ -59,10 +69,15 @@ const createCliente = async (req, res) => {
 // PUT /api/clientes/:dni - Modificar los datos de un cliente
 const updateCliente = async (req, res) => {
   try {
-    const { dni } = req.params;
+    const dniNum = Number(req.params.dni);
+
+    if (isNaN(dniNum)) {
+      return sendError(res, 400, 'El DNI debe ser un número entero válido');
+    }
+
     const { nombre, apellido, telefono, email, estado } = req.body;
 
-    const cliente = await Cliente.findOne({ where: { dni } });
+    const cliente = await Cliente.findByPk(dniNum);
     if (!cliente) {
       return sendError(res, 404, 'Cliente no encontrado');
     }
@@ -70,8 +85,8 @@ const updateCliente = async (req, res) => {
     await cliente.update({
       nombre: nombre ? nombre.trim() : cliente.nombre,
       apellido: apellido ? apellido.trim() : cliente.apellido,
-      telefono: telefono !== undefined ? telefono : cliente.telefono,
-      email: email !== undefined ? email : cliente.email,
+      telefono: telefono !== undefined ? (telefono ? String(telefono).trim() : null) : cliente.telefono,
+      email: email !== undefined ? (email ? email.trim() : null) : cliente.email,
       estado: estado !== undefined ? estado : cliente.estado,
     });
 
@@ -84,9 +99,13 @@ const updateCliente = async (req, res) => {
 // DELETE /api/clientes/:dni - Eliminar un cliente
 const deleteCliente = async (req, res) => {
   try {
-    const { dni } = req.params;
+    const dniNum = Number(req.params.dni);
 
-    const cliente = await Cliente.findOne({ where: { dni } });
+    if (isNaN(dniNum)) {
+      return sendError(res, 400, 'El DNI debe ser un número entero válido');
+    }
+
+    const cliente = await Cliente.findByPk(dniNum);
     if (!cliente) {
       return sendError(res, 404, 'Cliente no encontrado');
     }
