@@ -7,7 +7,8 @@ const datosPublicos = (usuario) => ({
   id: usuario.id,
   email: usuario.email,
   rol: usuario.rol,
-  dniProfesor: usuario.dniProfesor
+  dniProfesor: usuario.dniProfesor,
+  debeCambiarPassword: usuario.debeCambiarPassword
 });
 
 // POST /auth/login
@@ -55,6 +56,11 @@ const cambiarPassword = async (req, res) => {
     }
     const errorPassword = validatePassword(passwordNueva);
     if (errorPassword) return res.status(400).json({ message: errorPassword });
+    if (passwordNueva === passwordActual) {
+      return res
+        .status(400)
+        .json({ message: 'La contraseña nueva tiene que ser distinta de la actual' });
+    }
 
     const usuario = await Usuario.unscoped().findByPk(req.user.id);
     if (!(await verifyPassword(passwordActual, usuario.passwordHash))) {
@@ -63,7 +69,8 @@ const cambiarPassword = async (req, res) => {
 
     await usuario.update({
       passwordHash: await hashPassword(passwordNueva),
-      tokenVersion: usuario.tokenVersion + 1
+      tokenVersion: usuario.tokenVersion + 1,
+      debeCambiarPassword: false
     });
 
     // Las sesiones anteriores quedan invalidadas; esta recibe un token nuevo

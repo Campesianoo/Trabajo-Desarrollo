@@ -21,7 +21,7 @@ const Rutina = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
       references: {
-        model: 'Clientes',
+        model: 'clientes', // tabla del modelo Cliente
         key: 'dni'
       }
     },

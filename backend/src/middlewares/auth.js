@@ -29,7 +29,8 @@ const authenticate = async (req, res, next) => {
       id: usuario.id,
       email: usuario.email,
       rol: usuario.rol,
-      dniProfesor: usuario.dniProfesor
+      dniProfesor: usuario.dniProfesor,
+      debeCambiarPassword: usuario.debeCambiarPassword
     };
     next();
   } catch (error) {
