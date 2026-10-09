@@ -3,10 +3,11 @@ const { Cliente, Usuario } = require('../models/associations');
 const { validatePassword, hashPassword, hashPasswordInicial } = require('../utils/password');
 const { toPositiveInt, isValidEmail, sendError } = require('../utils/http');
 
+// La cuenta es opcional: solo se trae lo necesario para saber si existe y su estado
 const incluirUsuario = {
   model: Usuario,
   as: 'usuario',
-  attributes: ['id', 'email', 'activo', 'debeCambiarPassword']
+  attributes: ['id', 'activo', 'debeCambiarPassword']
 };
 
 const aRespuesta = (cliente, usuario = cliente.usuario) => ({
@@ -14,21 +15,37 @@ const aRespuesta = (cliente, usuario = cliente.usuario) => ({
   nombre: cliente.nombre,
   apellido: cliente.apellido,
   telefono: cliente.telefono,
-  email: usuario.email,
-  activo: usuario.activo,
-  // true mientras el cliente no haya entrado por primera vez y elegido su contraseña
-  debeCambiarPassword: usuario.debeCambiarPassword
+  email: cliente.email,
+  estado: cliente.estado,
+  tieneCuenta: Boolean(usuario),
+  // Si puede entrar a la app (false si no tiene cuenta)
+  activo: usuario?.activo ?? false,
+  // true mientras siga con la contraseña que le dio el admin
+  debeCambiarPassword: usuario?.debeCambiarPassword ?? false
 });
 
 const textoValido = (valor) => typeof valor === 'string' && valor.trim().length > 0;
 
-// El teléfono puede llegar como número desde un formulario; se guarda siempre como texto
-const normalizarTelefono = (valor) =>
-  typeof valor === 'string' || typeof valor === 'number' ? String(valor).trim() : '';
+// Teléfono y email son opcionales: vacío o null se guarda como null
+const textoOpcional = (valor) =>
+  valor === null || valor === undefined || String(valor).trim() === ''
+    ? null
+    : String(valor).trim();
 
 const normalizarEmail = (email) => email.trim().toLowerCase();
 
 const emailEnUso = async (email) => Boolean(await Usuario.findOne({ where: { email } }));
+
+const crearCuenta = async (email, dni, transaction) =>
+  Usuario.create(
+    {
+      email,
+      passwordHash: await hashPasswordInicial(dni),
+      rol: 'cliente',
+      debeCambiarPassword: true
+    },
+    { transaction }
+  );
 
 const manejarError = (res, error, mensaje) => {
   // Respaldo por si dos altas simultáneas pasan los chequeos previos
@@ -43,7 +60,9 @@ const manejarError = (res, error, mensaje) => {
   if (error.name === 'SequelizeForeignKeyConstraintError') {
     return res
       .status(409)
-      .json({ message: 'No se puede eliminar: el cliente tiene registros asociados' });
+      .json({
+        message: 'No se puede eliminar: el cliente tiene registros asociados (por ej. rutinas)'
+      });
   }
   sendError(res, 500, mensaje, error);
 };
@@ -78,50 +97,51 @@ const getClienteByDni = async (req, res) => {
   }
 };
 
-// POST /clientes - crea el cliente y su cuenta (rol cliente) en una sola transacción
+// POST /clientes - con crearCuenta: true también crea su cuenta (contraseña inicial: el DNI)
 const createCliente = async (req, res) => {
   try {
-    const { dni, nombre, apellido, telefono, email, password } = req.body;
+    const { dni, nombre, apellido, telefono, email, estado, crearCuenta: conCuenta } = req.body;
     const dniNum = toPositiveInt(dni);
     if (!dniNum) {
       return res.status(400).json({ message: 'dni es obligatorio y debe ser un entero positivo' });
     }
-    const tel = normalizarTelefono(telefono);
-    if (!textoValido(nombre) || !textoValido(apellido) || !tel) {
-      return res.status(400).json({ message: 'nombre, apellido y telefono son obligatorios' });
+    if (!textoValido(nombre) || !textoValido(apellido)) {
+      return res.status(400).json({ message: 'nombre y apellido son obligatorios' });
     }
-    if (!isValidEmail(email)) return res.status(400).json({ message: 'email inválido' });
-    // Sin contraseña, la cuenta arranca con el DNI. En los dos casos la conoce el admin,
-    // así que la cuenta queda marcada para que el cliente elija la suya
-    if (password !== undefined && password !== '') {
-      const errorPassword = validatePassword(password);
-      if (errorPassword) return res.status(400).json({ message: errorPassword });
+    const emailNorm = textoOpcional(email) && normalizarEmail(String(email));
+    if (emailNorm && !isValidEmail(emailNorm)) {
+      return res.status(400).json({ message: 'email inválido' });
+    }
+    if (estado !== undefined && typeof estado !== 'boolean') {
+      return res.status(400).json({ message: 'estado debe ser true o false' });
+    }
+    if (conCuenta !== undefined && typeof conCuenta !== 'boolean') {
+      return res.status(400).json({ message: 'crearCuenta debe ser true o false' });
+    }
+    if (conCuenta && !emailNorm) {
+      return res
+        .status(400)
+        .json({ message: 'Para darle acceso a la app el cliente necesita un email' });
     }
 
-    const emailNorm = normalizarEmail(email);
     if (await Cliente.findByPk(dniNum)) {
       return res.status(409).json({ message: 'Ya existe un cliente con ese DNI' });
     }
-    if (await emailEnUso(emailNorm)) {
+    if (conCuenta && (await emailEnUso(emailNorm))) {
       return res.status(409).json({ message: 'Ya existe una cuenta con ese email' });
     }
 
-    // El hash se calcula antes de abrir la transacción para no tenerla abierta de más
-    const passwordHash = password
-      ? await hashPassword(password)
-      : await hashPasswordInicial(dniNum);
     const { cliente, usuario } = await sequelize.transaction(async (transaction) => {
-      const usuario = await Usuario.create(
-        { email: emailNorm, passwordHash, rol: 'cliente', debeCambiarPassword: true },
-        { transaction }
-      );
+      const usuario = conCuenta ? await crearCuenta(emailNorm, dniNum, transaction) : null;
       const cliente = await Cliente.create(
         {
           dni: dniNum,
           nombre: nombre.trim(),
           apellido: apellido.trim(),
-          telefono: tel,
-          idUsuario: usuario.id
+          telefono: textoOpcional(telefono),
+          email: emailNorm || null,
+          ...(estado !== undefined && { estado }),
+          idUsuario: usuario?.id ?? null
         },
         { transaction }
       );
@@ -134,7 +154,40 @@ const createCliente = async (req, res) => {
   }
 };
 
-// PUT /clientes/:dni - admite nombre, apellido, telefono, email, password y activo
+// POST /clientes/:dni/cuenta - da acceso a un cliente que todavía no tiene cuenta
+const crearCuentaCliente = async (req, res) => {
+  try {
+    const dni = toPositiveInt(req.params.dni);
+    if (!dni) return res.status(400).json({ message: 'dni inválido' });
+
+    const cliente = await Cliente.findByPk(dni);
+    if (!cliente) return res.status(404).json({ message: 'No encontrado' });
+    if (cliente.idUsuario)
+      return res.status(409).json({ message: 'El cliente ya tiene una cuenta' });
+    if (!cliente.email || !isValidEmail(cliente.email)) {
+      return res
+        .status(400)
+        .json({ message: 'El cliente no tiene un email válido: cargalo antes de darle acceso' });
+    }
+    const email = normalizarEmail(cliente.email);
+    if (await emailEnUso(email)) {
+      return res.status(409).json({ message: 'Ya existe una cuenta con el email del cliente' });
+    }
+
+    await sequelize.transaction(async (transaction) => {
+      const usuario = await crearCuenta(email, dni, transaction);
+      await cliente.update({ idUsuario: usuario.id }, { transaction });
+    });
+    res
+      .status(201)
+      .json({ message: 'Cuenta creada. La contraseña inicial es el DNI del cliente.' });
+  } catch (error) {
+    manejarError(res, error, 'Error al crear la cuenta');
+  }
+};
+
+// PUT /clientes/:dni - admite nombre, apellido, telefono, email, estado y, si tiene cuenta,
+// activo (si puede entrar) y password (el admin le pone una nueva)
 const updateCliente = async (req, res) => {
   try {
     const dni = toPositiveInt(req.params.dni);
@@ -142,34 +195,51 @@ const updateCliente = async (req, res) => {
 
     const cliente = await Cliente.findByPk(dni);
     if (!cliente) return res.status(404).json({ message: 'No encontrado' });
-    const usuario = await Usuario.findByPk(cliente.idUsuario);
+    const usuario = cliente.idUsuario ? await Usuario.findByPk(cliente.idUsuario) : null;
 
-    const { nombre, apellido, telefono, email, password, activo } = req.body;
+    const { nombre, apellido, telefono, email, estado, password, activo } = req.body;
     const cambiosCliente = {};
     const cambiosUsuario = {};
 
     for (const [campo, valor] of Object.entries({ nombre, apellido })) {
       if (valor === undefined) continue;
-      if (!textoValido(valor))
+      if (!textoValido(valor)) {
         return res.status(400).json({ message: `${campo} no puede estar vacío` });
+      }
       cambiosCliente[campo] = valor.trim();
     }
 
-    if (telefono !== undefined) {
-      const tel = normalizarTelefono(telefono);
-      if (!tel) return res.status(400).json({ message: 'telefono no puede estar vacío' });
-      cambiosCliente.telefono = tel;
-    }
+    if (telefono !== undefined) cambiosCliente.telefono = textoOpcional(telefono);
 
     if (email !== undefined) {
-      if (!isValidEmail(email)) return res.status(400).json({ message: 'email inválido' });
-      const emailNorm = normalizarEmail(email);
-      if (emailNorm !== usuario.email) {
+      const emailNorm = textoOpcional(email) && normalizarEmail(String(email));
+      if (emailNorm && !isValidEmail(emailNorm)) {
+        return res.status(400).json({ message: 'email inválido' });
+      }
+      if (!emailNorm && usuario) {
+        return res
+          .status(400)
+          .json({ message: 'El cliente tiene cuenta: el email no puede quedar vacío' });
+      }
+      cambiosCliente.email = emailNorm || null;
+      // El email del cliente es también el usuario con el que entra a la app
+      if (usuario && emailNorm !== usuario.email) {
         if (await emailEnUso(emailNorm)) {
           return res.status(409).json({ message: 'Ya existe una cuenta con ese email' });
         }
         cambiosUsuario.email = emailNorm;
       }
+    }
+
+    if (estado !== undefined) {
+      if (typeof estado !== 'boolean') {
+        return res.status(400).json({ message: 'estado debe ser true o false' });
+      }
+      cambiosCliente.estado = estado;
+    }
+
+    if ((activo !== undefined || password !== undefined) && !usuario) {
+      return res.status(400).json({ message: 'El cliente no tiene cuenta: primero dale acceso' });
     }
 
     if (activo !== undefined) {
@@ -200,7 +270,7 @@ const updateCliente = async (req, res) => {
   }
 };
 
-// DELETE /clientes/:dni - borra el cliente y su cuenta
+// DELETE /clientes/:dni - borra el cliente y su cuenta, si tiene
 const deleteCliente = async (req, res) => {
   try {
     const dni = toPositiveInt(req.params.dni);
@@ -210,8 +280,9 @@ const deleteCliente = async (req, res) => {
     if (!cliente) return res.status(404).json({ message: 'No encontrado' });
 
     await sequelize.transaction(async (transaction) => {
+      const { idUsuario } = cliente;
       await cliente.destroy({ transaction });
-      await Usuario.destroy({ where: { id: cliente.idUsuario }, transaction });
+      if (idUsuario) await Usuario.destroy({ where: { id: idUsuario }, transaction });
     });
     res.json({ message: 'Cliente eliminado' });
   } catch (error) {
@@ -223,6 +294,7 @@ module.exports = {
   getClientes,
   getClienteByDni,
   createCliente,
+  crearCuentaCliente,
   updateCliente,
   deleteCliente
 };

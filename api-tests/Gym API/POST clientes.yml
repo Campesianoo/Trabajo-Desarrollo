@@ -14,7 +14,8 @@ http:
         "nombre": "Juan",
         "apellido": "Pérez",
         "telefono": "3415551234",
-        "email": "cliente@powertrainer.test"
+        "email": "cliente@powertrainer.test",
+        "crearCuenta": true
       }
   auth: inherit
 

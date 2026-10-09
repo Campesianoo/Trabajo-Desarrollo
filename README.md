@@ -200,11 +200,11 @@ El backend usa login propio con **JWT guardado en una cookie httpOnly** (JavaScr
 | Rol | Permisos actuales |
 | --- | --- |
 | `admin` | Todo: gestión de usuarios, alta/baja/modificación de profesores y especialidades |
-| `profesor` | Consultar profesores y especialidades (su cuenta está vinculada a un profesor por `dniProfesor`) |
-| `cliente` | Consultar profesores y especialidades (su cuenta se crea junto con su registro de cliente) |
+| `profesor` | Consultar profesores, especialidades y clientes (su cuenta está vinculada a un profesor por `dniProfesor`) |
+| `cliente` | Consultar profesores y especialidades (su cuenta está vinculada a un cliente por `clientes.idUsuario`) |
 
 No hay registro público: las cuentas las crea un admin.
-- **Clientes:** `POST /api/clientes` crea el cliente y su cuenta en una sola operación.
+- **Clientes:** al darlo de alta con `POST /api/clientes` y `crearCuenta: true` (necesita email), o después con `POST /api/clientes/:dni/cuenta`. El email del cliente es el usuario con el que entra.
 - **Profesores:** al darlo de alta con `POST /api/profesores` y `crearCuenta: true`, o después con `POST /api/profesores/:dni/cuenta`.
 - **Admins:** desde `POST /api/usuarios`.
 
@@ -223,10 +223,11 @@ No hay registro público: las cuentas las crea un admin.
 | GET | `/api/auth/me` | Autenticado |
 | PUT | `/api/auth/password` `{ passwordActual, passwordNueva }` | Autenticado |
 | GET/POST/PUT/DELETE | `/api/usuarios` | Admin |
-| GET | `/api/clientes`, `/api/clientes/:dni` | Admin |
-| POST | `/api/clientes` `{ dni, nombre, apellido, telefono, email, password? }` (sin `password`, la inicial es el DNI) | Admin |
-| PUT | `/api/clientes/:dni` `{ nombre?, apellido?, telefono?, email?, password?, activo? }` | Admin |
-| DELETE | `/api/clientes/:dni` (borra también su cuenta) | Admin |
+| GET | `/api/clientes`, `/api/clientes/:dni` | Admin, profesor |
+| POST | `/api/clientes` `{ dni, nombre, apellido, telefono?, email?, estado?, crearCuenta? }` (con `crearCuenta: true` también crea su cuenta) | Admin |
+| POST | `/api/clientes/:dni/cuenta` (da acceso a un cliente existente) | Admin |
+| PUT | `/api/clientes/:dni` `{ nombre?, apellido?, telefono?, email?, estado?, password?, activo? }` (`password` y `activo` solo si tiene cuenta) | Admin |
+| DELETE | `/api/clientes/:dni` (borra también su cuenta, si tiene) | Admin |
 | POST | `/api/profesores` `{ ..., crearCuenta? }` (con `crearCuenta: true` también crea su cuenta) | Admin |
 | POST | `/api/profesores/:dni/cuenta` (da acceso a un profesor existente) | Admin |
 | DELETE | `/api/profesores/:dni` (borra también su cuenta, si tiene) | Admin |

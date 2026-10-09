@@ -2,8 +2,11 @@ const Profesor = require('./profesor');
 const Especialidad = require('./especialidad');
 const ProfesorEspecialidad = require('./profesorEspecialidad');
 const Usuario = require('./usuario');
-const Cliente = require('./cliente');
+const Rutina = require('./rutina');
+const RutinaEjercicio = require('./rutinaEjercicio');
+const Cliente = require('./Cliente'); 
 
+// Profesor <-> Especialidad (Muchos a Muchos)
 Profesor.belongsToMany(Especialidad, {
   through: ProfesorEspecialidad,
   foreignKey: 'dniProfesor',
@@ -22,8 +25,32 @@ Especialidad.belongsToMany(Profesor, {
 Usuario.belongsTo(Profesor, { foreignKey: 'dniProfesor', as: 'profesor', onDelete: 'RESTRICT' });
 Profesor.hasOne(Usuario, { foreignKey: 'dniProfesor', as: 'usuario', onDelete: 'RESTRICT' });
 
-// Cada cliente tiene exactamente una cuenta; la cuenta no se puede borrar mientras exista el cliente
-Cliente.belongsTo(Usuario, { foreignKey: 'idUsuario', as: 'usuario', onDelete: 'RESTRICT' });
-Usuario.hasOne(Cliente, { foreignKey: 'idUsuario', as: 'cliente', onDelete: 'RESTRICT' });
+// Cliente <-> Usuario (1 a 1 opcional)
+Cliente.belongsTo(Usuario, { foreignKey: 'idUsuario', as: 'usuario' });
+Usuario.hasOne(Cliente, { foreignKey: 'idUsuario', as: 'cliente' });
 
-module.exports = { Profesor, Especialidad, ProfesorEspecialidad, Usuario, Cliente };
+// Rutina <-> Profesor
+Rutina.belongsTo(Profesor, { foreignKey: 'dniProfesor', as: 'profesor' });
+Profesor.hasMany(Rutina, { foreignKey: 'dniProfesor', as: 'rutinas' });
+
+// Rutina <-> Cliente (Usa dniCliente como clave foránea)
+Rutina.belongsTo(Cliente, { foreignKey: 'dniCliente', as: 'cliente' });
+Cliente.hasMany(Rutina, { foreignKey: 'dniCliente', as: 'rutinas' });
+
+// Rutina <-> RutinaEjercicio
+Rutina.hasMany(RutinaEjercicio, {
+  foreignKey: 'idRutina',
+  as: 'ejercicios',
+  onDelete: 'CASCADE'
+});
+RutinaEjercicio.belongsTo(Rutina, { foreignKey: 'idRutina', as: 'rutina' });
+
+module.exports = { 
+  Profesor, 
+  Especialidad, 
+  ProfesorEspecialidad, 
+  Usuario, 
+  Rutina, 
+  RutinaEjercicio, 
+  Cliente 
+};
