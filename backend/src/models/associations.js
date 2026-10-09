@@ -5,6 +5,7 @@ const Usuario = require('./usuario');
 const Rutina = require('./rutina');
 const RutinaEjercicio = require('./rutinaEjercicio');
 const Cliente = require('./Cliente'); 
+const Membresia = require('./membresia');
 
 // Profesor <-> Especialidad (Muchos a Muchos)
 Profesor.belongsToMany(Especialidad, {
@@ -37,6 +38,10 @@ Profesor.hasMany(Rutina, { foreignKey: 'dniProfesor', as: 'rutinas' });
 Rutina.belongsTo(Cliente, { foreignKey: 'dniCliente', as: 'cliente' });
 Cliente.hasMany(Rutina, { foreignKey: 'dniCliente', as: 'rutinas' });
 
+// Cliente <-> Membresia (Un cliente puede tener muchas membresías)
+Cliente.hasMany(Membresia, { foreignKey: 'dniCliente', as: 'membresias' });
+Membresia.belongsTo(Cliente, { foreignKey: 'dniCliente', as: 'cliente' });
+
 // Rutina <-> RutinaEjercicio
 Rutina.hasMany(RutinaEjercicio, {
   foreignKey: 'idRutina',
@@ -52,5 +57,6 @@ module.exports = {
   Usuario, 
   Rutina, 
   RutinaEjercicio, 
-  Cliente 
+  Cliente,
+  Membresia
 };
