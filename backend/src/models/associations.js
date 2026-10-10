@@ -30,11 +30,11 @@ Cliente.belongsTo(Usuario, { foreignKey: 'idUsuario', as: 'usuario' });
 Usuario.hasOne(Cliente, { foreignKey: 'idUsuario', as: 'cliente' });
 
 // Rutina <-> Profesor
-Rutina.belongsTo(Profesor, { foreignKey: 'dniProfesor', as: 'profesor' });
+Rutina.belongsTo(Profesor, { foreignKey: 'dniProfesor', as: 'profesor', onDelete: 'RESTRICT' });
 Profesor.hasMany(Rutina, { foreignKey: 'dniProfesor', as: 'rutinas' });
 
 // Rutina <-> Cliente (Usa dniCliente como clave foránea)
-Rutina.belongsTo(Cliente, { foreignKey: 'dniCliente', as: 'cliente' });
+Rutina.belongsTo(Cliente, { foreignKey: 'dniCliente', as: 'cliente', onDelete: 'RESTRICT' });
 Cliente.hasMany(Rutina, { foreignKey: 'dniCliente', as: 'rutinas' });
 
 // Rutina <-> RutinaEjercicio
