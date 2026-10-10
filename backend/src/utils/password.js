@@ -19,10 +19,14 @@ const validatePassword = (password) => {
 
 const hashPassword = (password) => bcrypt.hash(password, SALT_ROUNDS);
 
+// Contraseña con la que arranca una cuenta creada por el admin. No pasa por validatePassword
+// (hay DNI de 7 dígitos); la cuenta queda con debeCambiarPassword para que el usuario la reemplace
+const hashPasswordInicial = (dni) => hashPassword(String(dni));
+
 const verifyPassword = async (password, hash) => {
   const valida = typeof password === 'string' && Buffer.byteLength(password, 'utf8') <= MAX_BYTES;
   const coincide = await bcrypt.compare(valida ? password : '', hash || DUMMY_HASH);
   return valida && Boolean(hash) && coincide;
 };
 
-module.exports = { validatePassword, hashPassword, verifyPassword };
+module.exports = { validatePassword, hashPassword, hashPasswordInicial, verifyPassword };
