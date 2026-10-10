@@ -19,7 +19,7 @@ const Rutina = sequelize.define(
     },
     dniCliente: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'clientes',
         key: 'dni'
@@ -27,7 +27,7 @@ const Rutina = sequelize.define(
     },
     dniProfesor: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'Profesores',
         key: 'dni'

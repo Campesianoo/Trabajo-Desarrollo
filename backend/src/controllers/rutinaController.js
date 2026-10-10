@@ -138,7 +138,7 @@ const createRutina = async (req, res) => {
       dniCliente: clienteDni,
       dniProfesor: profesorDni
     });
-    if (referenciasError) return res.status(404).json({ message: referenciasError });
+    if (referenciasError) return res.status(400).json({ message: referenciasError });
 
     const ejerciciosParseados = ejercicios.map((ejercicio) => parseExercise(ejercicio));
     const errorEjercicio = ejerciciosParseados.find((ejercicio) => ejercicio.error);
@@ -205,15 +205,27 @@ const updateRutina = async (req, res) => {
       }
     }
     if (dniProfesor !== undefined) {
-      if (req.user.rol !== 'admin') {
+      const dniProfesorNuevo = toPositiveInt(dniProfesor);
+      if (!dniProfesorNuevo) {
+        return res.status(400).json({ message: 'dniProfesor debe ser un entero positivo' });
+      }
+
+      if (req.user.rol === 'profesor') {
+        const dniProfesorActual = toPositiveInt(req.user.dniProfesor);
+        if (!dniProfesorActual || dniProfesorNuevo !== dniProfesorActual) {
+          return res.status(403).json({
+            message: 'Solo podés reasignar la rutina a tu propio dniProfesor'
+          });
+        }
+      }
+
+      if (req.user.rol !== 'admin' && req.user.rol !== 'profesor') {
         return res
           .status(403)
           .json({ message: 'Solo admin puede reasignar una rutina a otro profesor' });
       }
-      values.dniProfesor = toPositiveInt(dniProfesor);
-      if (!values.dniProfesor) {
-        return res.status(400).json({ message: 'dniProfesor debe ser un entero positivo' });
-      }
+
+      values.dniProfesor = dniProfesorNuevo;
     }
     if (!Object.keys(values).length) {
       return res.status(400).json({ message: 'Debe enviar al menos un campo para actualizar' });
@@ -223,7 +235,7 @@ const updateRutina = async (req, res) => {
       dniCliente: values.dniCliente ?? rutina.dniCliente,
       dniProfesor: values.dniProfesor ?? rutina.dniProfesor
     });
-    if (referenciasError) return res.status(404).json({ message: referenciasError });
+    if (referenciasError) return res.status(400).json({ message: referenciasError });
 
     await rutina.update(values);
     const rutinaCompleta = await Rutina.findByPk(idRutina, { include: rutinaIncludes });
