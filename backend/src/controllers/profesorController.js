@@ -4,7 +4,7 @@ const ProfesorEspecialidad = require('../models/profesorEspecialidad');
 const Usuario = require('../models/usuario');
 const sequelize = require('../config/database');
 const { hashPasswordInicial } = require('../utils/password');
-const { toPositiveInt, isValidEmail, sendError } = require('../utils/http');
+const { toPositiveInt, isValidEmail, sendError, esErrorDeReferencia } = require('../utils/http');
 
 // config. común para incluir las especialidades de un profesor
 const especialidadesInclude = {
@@ -14,30 +14,42 @@ const especialidadesInclude = {
   through: { attributes: [] }
 };
 
-// Solo para saber si tiene cuenta: los datos de la cuenta no se exponen en este endpoint
-const usuarioInclude = { model: Usuario, as: 'usuario', attributes: ['id'] };
+const textoValido = (valor) => typeof valor === 'string' && valor.trim().length > 0;
 
-const aRespuesta = (profesor) => {
-  const { usuario, ...datos } = profesor.toJSON();
-  return { ...datos, tieneCuenta: Boolean(usuario) };
+// Valida y normaliza los datos del profesor. Con parcial (edición) solo revisa los campos enviados.
+// Devuelve { datos } o { error }
+const validarCampos = ({ nombre, apellido, telefono, email }, parcial = false) => {
+  const datos = {};
+  const omitido = (valor) => parcial && valor === undefined;
+
+  for (const [campo, valor] of Object.entries({ nombre, apellido })) {
+    if (omitido(valor)) continue;
+    if (!textoValido(valor)) return { error: `${campo} es obligatorio` };
+    datos[campo] = valor.trim();
+  }
+  if (!omitido(telefono)) {
+    const tel =
+      typeof telefono === 'string' || typeof telefono === 'number' ? String(telefono).trim() : '';
+    if (!tel) return { error: 'telefono es obligatorio' };
+    datos.telefono = tel;
+  }
+  if (!omitido(email)) {
+    if (!isValidEmail(email)) return { error: 'email inválido' };
+    datos.email = email.trim().toLowerCase();
+  }
+  return { datos };
 };
 
-// Revisa si se le puede crear la cuenta de acceso a un profesor.
-// Devuelve null si se puede, o un objeto { status, message } con el motivo si no
-const validarNuevaCuenta = async (profesor) => {
-  if (await Usuario.findOne({ where: { dniProfesor: profesor.dni } })) {
-    return { status: 409, message: 'El profesor ya tiene una cuenta' };
+const manejarError = (res, error, mensaje) => {
+  if (error.name === 'SequelizeUniqueConstraintError') {
+    return res
+      .status(409)
+      .json({ message: 'Ya existe un profesor con ese DNI o una cuenta con ese email' });
   }
-  if (!isValidEmail(profesor.email)) {
-    return {
-      status: 400,
-      message: 'El email del profesor no es válido: corregilo antes de darle acceso'
-    };
+  if (error.name === 'SequelizeValidationError') {
+    return res.status(400).json({ message: error.errors.map((e) => e.message).join(', ') });
   }
-  if (await Usuario.findOne({ where: { email: profesor.email.trim().toLowerCase() } })) {
-    return { status: 409, message: 'Ya existe una cuenta con el email del profesor' };
-  }
-  return null;
+  sendError(res, 500, mensaje, error);
 };
 
 const crearCuenta = async (profesor, passwordHash, transaction) =>
@@ -56,9 +68,9 @@ const crearCuenta = async (profesor, passwordHash, transaction) =>
 const getProfesor = async (req, res) => {
   try {
     const profesores = await Profesor.findAll({
-      include: [especialidadesInclude, usuarioInclude]
+      include: [especialidadesInclude]
     });
-    res.json(profesores.map(aRespuesta));
+    res.json(profesores);
   } catch (error) {
     sendError(res, 500, 'Error al obtener profesores', error);
   }
@@ -71,43 +83,31 @@ const getProfesorByPk = async (req, res) => {
     if (!dni) return res.status(400).json({ message: 'dni inválido' });
 
     const profesor = await Profesor.findByPk(dni, {
-      include: [especialidadesInclude, usuarioInclude]
+      include: [especialidadesInclude]
     });
     if (!profesor) return res.status(404).json({ message: 'No encontrado' });
-    res.json(aRespuesta(profesor));
+    res.json(profesor);
   } catch (error) {
     sendError(res, 500, 'Error al obtener profesor', error);
   }
 };
 
-// POST - crea nuevo profesor. Con crearCuenta: true también crea su cuenta (contraseña inicial: el DNI)
+// POST - crea el profesor y su cuenta (contraseña inicial: el DNI) en una transacción
 const createProfesor = async (req, res) => {
   try {
-    const { dni, nombre, apellido, telefono, email, crearCuenta: conCuenta } = req.body;
-    const dniNum = toPositiveInt(dni);
+    const dniNum = toPositiveInt(req.body.dni);
     if (!dniNum)
       return res.status(400).json({ message: 'dni es obligatorio y debe ser un entero positivo' });
-    if (!nombre || !apellido || !telefono || !email) {
-      return res
-        .status(400)
-        .json({ message: 'nombre, apellido, telefono y email son obligatorios' });
-    }
-    if (!isValidEmail(email)) return res.status(400).json({ message: 'email inválido' });
-    if (conCuenta !== undefined && typeof conCuenta !== 'boolean') {
-      return res.status(400).json({ message: 'crearCuenta debe ser true o false' });
-    }
+    const { datos: campos, error: errorCampos } = validarCampos(req.body);
+    if (errorCampos) return res.status(400).json({ message: errorCampos });
 
-    const datos = { dni: dniNum, nombre, apellido, telefono: String(telefono), email };
-    if (!conCuenta) {
-      const nuevo = await Profesor.create(datos);
-      return res.status(201).json({ ...nuevo.toJSON(), tieneCuenta: false });
-    }
-
+    const datos = { dni: dniNum, ...campos };
     if (await Profesor.findByPk(dniNum)) {
       return res.status(409).json({ message: 'Ya existe un profesor con ese DNI' });
     }
-    const rechazo = await validarNuevaCuenta(datos);
-    if (rechazo) return res.status(rechazo.status).json({ message: rechazo.message });
+    if (await Usuario.findOne({ where: { email: datos.email } })) {
+      return res.status(409).json({ message: 'Ya existe una cuenta con ese email' });
+    }
 
     // El hash se calcula antes de abrir la transacción para no tenerla abierta de más
     const passwordHash = await hashPasswordInicial(dniNum);
@@ -116,39 +116,9 @@ const createProfesor = async (req, res) => {
       await crearCuenta(profesor, passwordHash, transaction);
       return profesor;
     });
-    res.status(201).json({ ...nuevo.toJSON(), tieneCuenta: true });
+    res.status(201).json({ ...nuevo.toJSON(), especialidades: [] });
   } catch (error) {
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      return res
-        .status(409)
-        .json({ message: 'Ya existe un profesor con ese DNI o una cuenta con ese email' });
-    }
-    sendError(res, 400, 'Error al crear profesor', error);
-  }
-};
-
-// POST /profesores/:dni/cuenta - da acceso a un profesor que todavía no tiene cuenta
-const crearCuentaProfesor = async (req, res) => {
-  try {
-    const dni = toPositiveInt(req.params.dni);
-    if (!dni) return res.status(400).json({ message: 'dni inválido' });
-
-    const profesor = await Profesor.findByPk(dni);
-    if (!profesor) return res.status(404).json({ message: 'No encontrado' });
-    const rechazo = await validarNuevaCuenta(profesor);
-    if (rechazo) return res.status(rechazo.status).json({ message: rechazo.message });
-
-    await crearCuenta(profesor, await hashPasswordInicial(dni));
-    res
-      .status(201)
-      .json({ message: 'Cuenta creada. La contraseña inicial es el DNI del profesor.' });
-  } catch (error) {
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      return res
-        .status(409)
-        .json({ message: 'El profesor ya tiene cuenta o el email está en uso' });
-    }
-    sendError(res, 500, 'Error al crear la cuenta', error);
+    manejarError(res, error, 'Error al crear profesor');
   }
 };
 
@@ -158,23 +128,38 @@ const updateProfesor = async (req, res) => {
     const dni = toPositiveInt(req.params.dni);
     if (!dni) return res.status(400).json({ message: 'dni inválido' });
 
-    const profesor = await Profesor.findByPk(dni); //busca
+    const profesor = await Profesor.findByPk(dni);
     if (!profesor) return res.status(404).json({ message: 'No encontrado' });
 
-    const { dni: _dni, ...datos } = req.body; // la PK no se puede modificar por este endpoint
-    if (datos.telefono !== undefined) datos.telefono = String(datos.telefono);
-    if (datos.email !== undefined && !isValidEmail(datos.email)) {
-      return res.status(400).json({ message: 'email inválido' });
+    // Solo se toman los campos editables: el DNI (PK) no se puede modificar
+    const { datos, error: errorCampos } = validarCampos(req.body, true);
+    if (errorCampos) return res.status(400).json({ message: errorCampos });
+    if (!Object.keys(datos).length) {
+      return res.status(400).json({ message: 'No se envió ningún campo para actualizar' });
     }
 
-    await profesor.update(datos); //actualiza
-    res.json(profesor);
+    // El email del profesor es también el de su cuenta: si cambia, se cambian los dos
+    const cuenta = await Usuario.findOne({ where: { dniProfesor: dni } });
+    const cambiaEmailCuenta = cuenta && datos.email !== undefined && datos.email !== cuenta.email;
+    if (cambiaEmailCuenta && (await Usuario.findOne({ where: { email: datos.email } }))) {
+      return res.status(409).json({ message: 'Ya existe una cuenta con ese email' });
+    }
+
+    await sequelize.transaction(async (transaction) => {
+      await profesor.update(datos, { transaction });
+      if (cambiaEmailCuenta) await cuenta.update({ email: datos.email }, { transaction });
+    });
+
+    const actualizado = await Profesor.findByPk(dni, {
+      include: [especialidadesInclude]
+    });
+    res.json(actualizado);
   } catch (error) {
-    sendError(res, 400, 'Error al actualizar', error);
+    manejarError(res, error, 'Error al actualizar profesor');
   }
 };
 
-// DELETE elimina un profesor por dni, junto con su cuenta de acceso si tiene
+// DELETE elimina un profesor por dni, junto con su cuenta de acceso
 const deleteProfesor = async (req, res) => {
   try {
     const dni = toPositiveInt(req.params.dni);
@@ -189,9 +174,10 @@ const deleteProfesor = async (req, res) => {
     });
     res.json({ message: 'Profesor eliminado' });
   } catch (error) {
-    if (error.name === 'SequelizeForeignKeyConstraintError') {
+    // Sus especialidades se quitan solas (CASCADE); lo que bloquea el borrado son sus rutinas
+    if (esErrorDeReferencia(error)) {
       return res.status(409).json({
-        message: 'No se puede eliminar: el profesor tiene registros asociados (especialidades)'
+        message: 'No se puede eliminar: el profesor tiene rutinas asignadas'
       });
     }
     sendError(res, 500, 'Error al eliminar', error);
@@ -245,7 +231,6 @@ module.exports = {
   getProfesor,
   getProfesorByPk,
   createProfesor,
-  crearCuentaProfesor,
   updateProfesor,
   deleteProfesor,
   asignarEspecialidad,

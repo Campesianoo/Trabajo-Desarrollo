@@ -4,7 +4,7 @@ const {
   getClientes,
   getClienteByDni,
   createCliente,
-  crearCuentaCliente,
+
   updateCliente,
   deleteCliente
 } = require('../controllers/clienteController');
@@ -21,8 +21,5 @@ router.get('/:dni', adminOProfesor, getClienteByDni);
 router.post('/', soloAdmin, createCliente);
 router.put('/:dni', soloAdmin, updateCliente);
 router.delete('/:dni', soloAdmin, deleteCliente);
-
-// cuenta de acceso del cliente (contraseña inicial: su DNI)
-router.post('/:dni/cuenta', soloAdmin, crearCuentaCliente);
 
 module.exports = router;

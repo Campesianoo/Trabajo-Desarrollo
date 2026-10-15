@@ -18,4 +18,10 @@ const sendError = (res, status, message, error) => {
   res.status(status).json(body);
 };
 
-module.exports = { toPositiveInt, isValidEmail, sendError };
+// true si no se pudo borrar porque otra tabla lo referencia. Postgres usa 23503 (foreign key) o
+// 23001 (restrict) según cómo esté definida la clave, y Sequelize solo reconoce el primero
+const esErrorDeReferencia = (error) =>
+  error?.name === 'SequelizeForeignKeyConstraintError' ||
+  ['23503', '23001'].includes(error?.parent?.code);
+
+module.exports = { toPositiveInt, isValidEmail, sendError, esErrorDeReferencia };

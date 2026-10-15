@@ -2,7 +2,7 @@ const Usuario = require('../models/usuario');
 const Profesor = require('../models/profesor');
 const { setAuthCookie } = require('../config/auth');
 const { validatePassword, hashPassword } = require('../utils/password');
-const { toPositiveInt, isValidEmail, sendError } = require('../utils/http');
+const { toPositiveInt, isValidEmail, sendError, esErrorDeReferencia } = require('../utils/http');
 
 // Un usuario cliente siempre va junto con su registro de Cliente: se crean y borran desde ahí
 const MENSAJE_CLIENTES = 'Las cuentas de clientes se gestionan desde /api/clientes';
@@ -177,7 +177,7 @@ const deleteUsuario = async (req, res) => {
     await usuario.destroy();
     res.json({ message: 'Usuario eliminado' });
   } catch (error) {
-    if (error.name === 'SequelizeForeignKeyConstraintError') {
+    if (esErrorDeReferencia(error)) {
       return res
         .status(409)
         .json({ message: 'No se puede eliminar: el usuario tiene registros asociados' });
