@@ -5,6 +5,7 @@ const Usuario = require('./usuario');
 const Rutina = require('./rutina');
 const RutinaEjercicio = require('./rutinaEjercicio');
 const Cliente = require('./Cliente');
+const Membresia = require('./membresia');
 
 // Profesor <-> Especialidad (Muchos a Muchos)
 Profesor.belongsToMany(Especialidad, {
@@ -34,9 +35,13 @@ Usuario.hasOne(Cliente, { foreignKey: 'idUsuario', as: 'cliente', onDelete: 'RES
 Rutina.belongsTo(Profesor, { foreignKey: 'dniProfesor', as: 'profesor', onDelete: 'NO ACTION' });
 Profesor.hasMany(Rutina, { foreignKey: 'dniProfesor', as: 'rutinas' });
 
-// Rutina <-> Cliente (Usa dniCliente como clave foránea)
-Rutina.belongsTo(Cliente, { foreignKey: 'dniCliente', as: 'cliente', onDelete: 'NO ACTION' });
+// Rutina <-> Cliente (Usa dniCliente como clave foránea). Al borrar un cliente se borran sus rutinas
+Rutina.belongsTo(Cliente, { foreignKey: 'dniCliente', as: 'cliente', onDelete: 'CASCADE' });
 Cliente.hasMany(Rutina, { foreignKey: 'dniCliente', as: 'rutinas' });
+
+// Cliente <-> Membresia (un cliente puede tener muchas). Al borrar un cliente se borran sus membresías
+Cliente.hasMany(Membresia, { foreignKey: 'dniCliente', as: 'membresias', onDelete: 'CASCADE' });
+Membresia.belongsTo(Cliente, { foreignKey: 'dniCliente', as: 'cliente', onDelete: 'CASCADE' });
 
 // Rutina <-> RutinaEjercicio
 Rutina.hasMany(RutinaEjercicio, {
@@ -53,5 +58,6 @@ module.exports = {
   Usuario,
   Rutina,
   RutinaEjercicio,
-  Cliente
+  Cliente,
+  Membresia
 };
