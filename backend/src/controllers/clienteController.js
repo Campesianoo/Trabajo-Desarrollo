@@ -1,7 +1,8 @@
 const sequelize = require('../config/database');
-const { Cliente, Usuario } = require('../models/associations');
+const { Cliente, Usuario, Membresia } = require('../models/associations');
 const { validatePassword, hashPassword, hashPasswordInicial } = require('../utils/password');
 const { toPositiveInt, isValidEmail, sendError, esErrorDeReferencia } = require('../utils/http');
+const { calcularEstado } = require('../utils/membresia');
 
 // Todo cliente tiene una cuenta: se trae lo necesario para saber su estado
 const incluirUsuario = {
@@ -22,6 +23,41 @@ const aRespuesta = (cliente, usuario = cliente.usuario) => ({
   // true mientras siga con la contraseña que le dio el admin
   debeCambiarPassword: usuario.debeCambiarPassword
 });
+
+// Cuál membresía mostrar de cada cliente: la que está en curso (Activa o Por vencer), si no la
+// próxima (Pendiente) y si no la última que tuvo (Vencida)
+const PRIORIDAD_ESTADO = { Activa: 0, 'Por vencer': 0, Pendiente: 1, Vencida: 2 };
+
+const membresiaActual = (membresias) => {
+  const candidatas = membresias
+    .map((m) => ({
+      fechaInicio: m.fechaInicio,
+      fechaVencimiento: m.fechaVencimiento,
+      estado: calcularEstado(m)
+    }))
+    .sort(
+      (a, b) =>
+        PRIORIDAD_ESTADO[a.estado] - PRIORIDAD_ESTADO[b.estado] ||
+        (a.estado === 'Pendiente'
+          ? a.fechaInicio.localeCompare(b.fechaInicio)
+          : b.fechaVencimiento.localeCompare(a.fechaVencimiento))
+    );
+  return candidatas[0] ?? null;
+};
+
+// Solo el admin ve las membresías: al profesor no se le agrega el campo
+const conMembresia = async (respuestas, user) => {
+  if (user.rol !== 'admin' || respuestas.length === 0) return respuestas;
+  const membresias = await Membresia.findAll({
+    where: { dniCliente: respuestas.map((r) => r.dni) },
+    attributes: ['dniCliente', 'fechaInicio', 'fechaVencimiento']
+  });
+  const porCliente = new Map();
+  for (const m of membresias) {
+    porCliente.set(m.dniCliente, [...(porCliente.get(m.dniCliente) ?? []), m]);
+  }
+  return respuestas.map((r) => ({ ...r, membresia: membresiaActual(porCliente.get(r.dni) ?? []) }));
+};
 
 const textoValido = (valor) => typeof valor === 'string' && valor.trim().length > 0;
 
@@ -77,7 +113,12 @@ const getClientes = async (req, res) => {
         ['nombre', 'ASC']
       ]
     });
-    res.json(clientes.map((cliente) => aRespuesta(cliente)));
+    res.json(
+      await conMembresia(
+        clientes.map((cliente) => aRespuesta(cliente)),
+        req.user
+      )
+    );
   } catch (error) {
     sendError(res, 500, 'Error al obtener clientes', error);
   }
@@ -132,7 +173,8 @@ const getClienteByDni = async (req, res) => {
 
     const cliente = await Cliente.findByPk(dni, { include: incluirUsuario });
     if (!cliente) return res.status(404).json({ message: 'No encontrado' });
-    res.json(aRespuesta(cliente));
+    const [respuesta] = await conMembresia([aRespuesta(cliente)], req.user);
+    res.json(respuesta);
   } catch (error) {
     sendError(res, 500, 'Error al obtener cliente', error);
   }
