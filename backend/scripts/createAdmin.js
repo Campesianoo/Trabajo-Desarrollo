@@ -1,6 +1,7 @@
 // Crea el primer usuario admin a partir de ADMIN_EMAIL y ADMIN_PASSWORD del .env.
 // Uso: pnpm run create-admin
 const sequelize = require('../src/config/database');
+const migrator = require('../src/config/migrator');
 const { Usuario } = require('../src/models/associations');
 const { validatePassword, hashPassword } = require('../src/utils/password');
 const { isValidEmail } = require('../src/utils/http');
@@ -13,7 +14,7 @@ const main = async () => {
   if (errorPassword) throw new Error(`ADMIN_PASSWORD: ${errorPassword}`);
 
   await sequelize.authenticate();
-  await sequelize.sync();
+  await migrator.up();
 
   const [usuario, creado] = await Usuario.findOrCreate({
     where: { email: email.trim().toLowerCase() },

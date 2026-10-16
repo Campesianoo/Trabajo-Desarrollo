@@ -7,36 +7,39 @@ const Cliente = sequelize.define(
     dni: {
       type: DataTypes.INTEGER,
       primaryKey: true,
-      allowNull: false,
+      allowNull: false
     },
     nombre: {
       type: DataTypes.STRING(100),
-      allowNull: false,
+      allowNull: false
     },
     apellido: {
       type: DataTypes.STRING(100),
-      allowNull: false,
+      allowNull: false
     },
     telefono: {
       type: DataTypes.STRING(30),
-      allowNull: true,
+      allowNull: true
     },
+    // Es también el usuario con el que entra a la app
     email: {
       type: DataTypes.STRING(100),
-      allowNull: true,
+      allowNull: false
     },
     estado: {
       type: DataTypes.BOOLEAN,
-      defaultValue: true,
+      defaultValue: true
     },
+    // Todo cliente tiene una cuenta para entrar a la app, y una cuenta pertenece a un solo cliente
     idUsuario: {
       type: DataTypes.INTEGER,
-      allowNull: true,
-    },
+      allowNull: false,
+      unique: true
+    }
   },
   {
     tableName: 'clientes',
-    timestamps: true,
+    timestamps: true
   }
 );
 

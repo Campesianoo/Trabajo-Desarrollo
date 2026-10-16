@@ -1,5 +1,7 @@
 const Especialidad = require('../models/especialidad');
-const { toPositiveInt, sendError } = require('../utils/http');
+const { toPositiveInt, sendError, esErrorDeReferencia } = require('../utils/http');
+
+const nombreValido = (nombre) => typeof nombre === 'string' && nombre.trim().length > 0;
 
 // GET /especialidades - trae todas
 const getEspecialidades = async (req, res) => {
@@ -29,14 +31,12 @@ const getEspecialidadByPk = async (req, res) => {
 const createEspecialidad = async (req, res) => {
   try {
     const { nombre } = req.body;
-    if (!nombre || typeof nombre !== 'string' || !nombre.trim()) {
-      return res.status(400).json({ message: 'nombre es obligatorio' });
-    }
+    if (!nombreValido(nombre)) return res.status(400).json({ message: 'nombre es obligatorio' });
 
     const nueva = await Especialidad.create({ nombre: nombre.trim() });
     res.status(201).json(nueva);
   } catch (error) {
-    sendError(res, 400, 'Error al crear especialidad', error);
+    sendError(res, 500, 'Error al crear especialidad', error);
   }
 };
 
@@ -46,14 +46,17 @@ const updateEspecialidad = async (req, res) => {
     const id = toPositiveInt(req.params.id);
     if (!id) return res.status(400).json({ message: 'id inválido' });
 
-    const especialidad = await Especialidad.findByPk(id); //busca
+    const especialidad = await Especialidad.findByPk(id);
     if (!especialidad) return res.status(404).json({ message: 'No encontrado' });
 
-    const { id: _id, ...datos } = req.body; // la PK no se puede modificar por este endpoint
-    await especialidad.update(datos); //actualiza
+    // El único campo editable es el nombre
+    const { nombre } = req.body;
+    if (!nombreValido(nombre)) return res.status(400).json({ message: 'nombre es obligatorio' });
+
+    await especialidad.update({ nombre: nombre.trim() });
     res.json(especialidad);
   } catch (error) {
-    sendError(res, 400, 'Error al actualizar', error);
+    sendError(res, 500, 'Error al actualizar especialidad', error);
   }
 };
 
@@ -69,10 +72,12 @@ const deleteEspecialidad = async (req, res) => {
     await especialidad.destroy(); //elimina
     res.json({ message: 'Especialidad eliminada' });
   } catch (error) {
-    if (error.name === 'SequelizeForeignKeyConstraintError') {
+    // Los profesores que la tenían asignada la pierden solos (CASCADE). Este 409 cubre a tablas
+    // que la referencien en el futuro (por ej. clases)
+    if (esErrorDeReferencia(error)) {
       return res
         .status(409)
-        .json({ message: 'No se puede eliminar: la especialidad tiene profesores asignados' });
+        .json({ message: 'No se puede eliminar: la especialidad tiene registros asociados' });
     }
     sendError(res, 500, 'Error al eliminar', error);
   }
