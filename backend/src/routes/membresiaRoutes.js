@@ -5,23 +5,22 @@ const {
   getMembresiasByCliente,
   createMembresia,
   updateMembresia,
-  deleteMembresia,
+  deleteMembresia
 } = require('../controllers/membresiaController');
 const { authenticate, authorize } = require('../middlewares/auth');
 
 const router = Router();
 
-// Todas las rutas requieren autenticación
 router.use(authenticate);
 
 const soloAdmin = authorize('admin');
+// Las membresías las ve el admin y cada cliente las suyas (el controller filtra). El profesor no
+const adminOCliente = authorize('admin', 'cliente');
 
-// Consultas (Accesibles para usuarios autenticados)
-router.get('/', getMembresias);
-router.get('/:id', getMembresiaById);
-router.get('/cliente/:dni', getMembresiasByCliente);
+router.get('/', adminOCliente, getMembresias);
+router.get('/cliente/:dni', soloAdmin, getMembresiasByCliente);
+router.get('/:id', adminOCliente, getMembresiaById);
 
-// Operaciones de modificación (Solo administradores)
 router.post('/', soloAdmin, createMembresia);
 router.put('/:id', soloAdmin, updateMembresia);
 router.delete('/:id', soloAdmin, deleteMembresia);

@@ -252,6 +252,20 @@ El backend expone los siguientes endpoints para gestionar rutinas y ejercicios a
 
 Los ids de rutina y ejercicio se manejan como enteros positivos y las referencias a cliente/profesor deben existir; si no existen, la API responde `400` para evitar datos huérfanos.
 
+### CRUD de membresías
+Cada pago de un cliente es una membresía (`fechaPago`, `fechaInicio`, `fechaVencimiento`, `valor`). El **estado no se guarda**: se calcula con las fechas y la respuesta lo incluye como `estado`: `Pendiente` (todavía no empezó), `Activa`, `Por vencer` (vence en 7 días o menos) o `Vencida`.
+
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| GET | `/api/membresias` | Admin (todas) y cliente (solo las suyas). El profesor no tiene acceso |
+| GET | `/api/membresias/:id` | Admin y cliente (solo las suyas) |
+| GET | `/api/membresias/cliente/:dni` | Admin |
+| POST | `/api/membresias` `{ dniCliente, fechaPago, fechaInicio, fechaVencimiento, valor }` | Admin |
+| PUT | `/api/membresias/:id` `{ fechaPago?, fechaInicio?, fechaVencimiento?, valor? }` | Admin |
+| DELETE | `/api/membresias/:id` | Admin |
+
+Las fechas van como `AAAA-MM-DD` y tienen que existir; `fechaInicio` no puede ser posterior a `fechaVencimiento` y `valor` va de 0 a 99999999.99. El cliente de una membresía no se puede cambiar: si se cargó mal, se elimina y se crea de nuevo.
+
 ### Variables en el deploy (Render)
 | Variable | Valor |
 | --- | --- |
