@@ -1,5 +1,8 @@
 const { Sequelize } = require('sequelize');
+const { types } = require('pg');
 require('dotenv').config();
+
+types.setTypeParser(types.builtins.INT8, (value) => Number(value));
 
 const sequelize = process.env.DATABASE_URL
   ? new Sequelize(process.env.DATABASE_URL, {

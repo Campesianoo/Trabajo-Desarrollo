@@ -238,6 +238,20 @@ No hay registro público: las cuentas las crea un admin.
 - Al cargar la app, llamar a `GET /api/auth/me` para saber si hay sesión: `401` significa que no la hay o que expiró.
 - El frontend no llama al backend directo: pide todo a su propio origen en `/api` y Vite (en local) o Vercel (en producción, ver `vercel.json` del frontend) lo reenvían. Así la cookie es del mismo sitio y se puede dejar `COOKIE_SAMESITE=lax`. Si se llamara directo de `vercel.app` a `onrender.com`, la cookie sería de terceros y Safari la bloquearía.
 
+### CRUD de rutinas
+El backend expone los siguientes endpoints para gestionar rutinas y ejercicios asociados:
+
+- `GET /api/rutinas` — lista rutinas visibles según el rol autenticado.
+- `GET /api/rutinas/:id` — obtiene una rutina por id.
+- `POST /api/rutinas` — crea una rutina con `nombreRutina`, `diaSemana`, `dniCliente`, `dniProfesor` y `ejercicios`.
+- `PUT /api/rutinas/:id` — actualiza una rutina existente.
+- `DELETE /api/rutinas/:id` — elimina una rutina y sus ejercicios.
+- `POST /api/rutinas/:id/ejercicios` — agrega un ejercicio a una rutina.
+- `PUT /api/rutinas/:id/ejercicios/:idEjercicio` — actualiza un ejercicio.
+- `DELETE /api/rutinas/:id/ejercicios/:idEjercicio` — elimina un ejercicio.
+
+Los ids de rutina y ejercicio se manejan como enteros positivos y las referencias a cliente/profesor deben existir; si no existen, la API responde `400` para evitar datos huérfanos.
+
 ### Variables en el deploy (Render)
 | Variable | Valor |
 | --- | --- |
