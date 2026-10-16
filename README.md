@@ -169,6 +169,10 @@ Durante la evaluación de cada entrega se considerarán:
 * Innovación, investigación y desafíos asumidos.
 * Documentación solicitada.
 
+## Documentación del proyecto
+
+Instalación, arquitectura, API, decisiones de diseño, tests, seguimiento y deploy están en [`docs/`](docs/README.md).
+
 ## 6. FAQ
 
 En la sección de [FAQ](FAQ.md) podrán encontrar respuestas a las consultas más frecuentes que se van realizando.
