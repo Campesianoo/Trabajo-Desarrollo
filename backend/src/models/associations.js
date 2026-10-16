@@ -4,7 +4,7 @@ const ProfesorEspecialidad = require('./profesorEspecialidad');
 const Usuario = require('./usuario');
 const Rutina = require('./rutina');
 const RutinaEjercicio = require('./rutinaEjercicio');
-const Cliente = require('./Cliente'); 
+const Cliente = require('./Cliente');
 const Membresia = require('./membresia');
 
 // Profesor <-> Especialidad (Muchos a Muchos)
@@ -26,20 +26,20 @@ Especialidad.belongsToMany(Profesor, {
 Usuario.belongsTo(Profesor, { foreignKey: 'dniProfesor', as: 'profesor', onDelete: 'RESTRICT' });
 Profesor.hasOne(Usuario, { foreignKey: 'dniProfesor', as: 'usuario', onDelete: 'RESTRICT' });
 
-// Cliente <-> Usuario (1 a 1 opcional)
-Cliente.belongsTo(Usuario, { foreignKey: 'idUsuario', as: 'usuario' });
-Usuario.hasOne(Cliente, { foreignKey: 'idUsuario', as: 'cliente' });
+// Cliente <-> Usuario (1 a 1): no se puede borrar la cuenta de un cliente sin borrar al cliente
+Cliente.belongsTo(Usuario, { foreignKey: 'idUsuario', as: 'usuario', onDelete: 'RESTRICT' });
+Usuario.hasOne(Cliente, { foreignKey: 'idUsuario', as: 'cliente', onDelete: 'RESTRICT' });
 
-// Rutina <-> Profesor
-Rutina.belongsTo(Profesor, { foreignKey: 'dniProfesor', as: 'profesor', onDelete: 'RESTRICT' });
+// Rutina <-> Profesor. NO ACTION como en la base: no se puede borrar un profesor con rutinas
+// (el esquema real lo definen las migraciones; esto tiene que coincidir con ellas)
+Rutina.belongsTo(Profesor, { foreignKey: 'dniProfesor', as: 'profesor', onDelete: 'NO ACTION' });
 Profesor.hasMany(Rutina, { foreignKey: 'dniProfesor', as: 'rutinas' });
 
 // Rutina <-> Cliente (Usa dniCliente como clave foránea). Al borrar un cliente se borran sus rutinas
 Rutina.belongsTo(Cliente, { foreignKey: 'dniCliente', as: 'cliente', onDelete: 'CASCADE' });
 Cliente.hasMany(Rutina, { foreignKey: 'dniCliente', as: 'rutinas' });
 
-// Cliente <-> Membresia (Un cliente puede tener muchas membresías)
-// Al borrar un cliente se borran sus membresías
+// Cliente <-> Membresia (un cliente puede tener muchas). Al borrar un cliente se borran sus membresías
 Cliente.hasMany(Membresia, { foreignKey: 'dniCliente', as: 'membresias', onDelete: 'CASCADE' });
 Membresia.belongsTo(Cliente, { foreignKey: 'dniCliente', as: 'cliente', onDelete: 'CASCADE' });
 
@@ -51,13 +51,13 @@ Rutina.hasMany(RutinaEjercicio, {
 });
 RutinaEjercicio.belongsTo(Rutina, { foreignKey: 'idRutina', as: 'rutina' });
 
-module.exports = { 
-  Profesor, 
-  Especialidad, 
-  ProfesorEspecialidad, 
-  Usuario, 
-  Rutina, 
-  RutinaEjercicio, 
+module.exports = {
+  Profesor,
+  Especialidad,
+  ProfesorEspecialidad,
+  Usuario,
+  Rutina,
+  RutinaEjercicio,
   Cliente,
   Membresia
 };

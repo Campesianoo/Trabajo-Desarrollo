@@ -1,9 +1,9 @@
 const sequelize = require('../config/database');
 const { Cliente, Usuario } = require('../models/associations');
 const { validatePassword, hashPassword, hashPasswordInicial } = require('../utils/password');
-const { toPositiveInt, isValidEmail, sendError } = require('../utils/http');
+const { toPositiveInt, isValidEmail, sendError, esErrorDeReferencia } = require('../utils/http');
 
-// La cuenta es opcional: solo se trae lo necesario para saber si existe y su estado
+// Todo cliente tiene una cuenta: se trae lo necesario para saber su estado
 const incluirUsuario = {
   model: Usuario,
   as: 'usuario',
@@ -17,20 +17,22 @@ const aRespuesta = (cliente, usuario = cliente.usuario) => ({
   telefono: cliente.telefono,
   email: cliente.email,
   estado: cliente.estado,
-  tieneCuenta: Boolean(usuario),
-  // Si puede entrar a la app (false si no tiene cuenta)
-  activo: usuario?.activo ?? false,
+  // Si puede entrar a la app
+  activo: usuario.activo,
   // true mientras siga con la contraseña que le dio el admin
-  debeCambiarPassword: usuario?.debeCambiarPassword ?? false
+  debeCambiarPassword: usuario.debeCambiarPassword
 });
 
 const textoValido = (valor) => typeof valor === 'string' && valor.trim().length > 0;
 
-// Teléfono y email son opcionales: vacío o null se guarda como null
+// El teléfono es opcional: vacío o null se guarda como null
 const textoOpcional = (valor) =>
   valor === null || valor === undefined || String(valor).trim() === ''
     ? null
     : String(valor).trim();
+
+// Es lo que entra en la columna (STRING(30)); más largo daría un error de la base
+const TELEFONO_MAX = 30;
 
 const normalizarEmail = (email) => email.trim().toLowerCase();
 
@@ -57,12 +59,10 @@ const manejarError = (res, error, mensaje) => {
   if (error.name === 'SequelizeValidationError') {
     return res.status(400).json({ message: error.errors.map((e) => e.message).join(', ') });
   }
-  if (error.name === 'SequelizeForeignKeyConstraintError') {
-    return res
-      .status(409)
-      .json({
-        message: 'No se puede eliminar: el cliente tiene registros asociados (por ej. rutinas)'
-      });
+  if (esErrorDeReferencia(error)) {
+    return res.status(409).json({
+      message: 'No se puede eliminar: el cliente tiene registros asociados (por ej. rutinas)'
+    });
   }
   sendError(res, 500, mensaje, error);
 };
@@ -83,6 +83,47 @@ const getClientes = async (req, res) => {
   }
 };
 
+// GET /clientes/me - el cliente que inició sesión ve sus propios datos
+const getMiPerfil = async (req, res) => {
+  try {
+    const cliente = await Cliente.findOne({
+      where: { idUsuario: req.user.id },
+      include: incluirUsuario
+    });
+    if (!cliente) return res.status(404).json({ message: 'No encontrado' });
+    res.json(aRespuesta(cliente));
+  } catch (error) {
+    sendError(res, 500, 'Error al obtener el perfil', error);
+  }
+};
+
+// PUT /clientes/me - el cliente solo puede cambiar su teléfono. El resto de sus datos (nombre,
+// email, DNI, acceso) los corrige el admin, porque afectan su cuenta y sus registros
+const updateMiPerfil = async (req, res) => {
+  try {
+    const cliente = await Cliente.findOne({
+      where: { idUsuario: req.user.id },
+      include: incluirUsuario
+    });
+    if (!cliente) return res.status(404).json({ message: 'No encontrado' });
+
+    if (!('telefono' in req.body)) {
+      return res.status(400).json({ message: 'Solo podés modificar tu teléfono' });
+    }
+    const telefono = textoOpcional(req.body.telefono);
+    if (telefono !== null && telefono.length > TELEFONO_MAX) {
+      return res
+        .status(400)
+        .json({ message: `telefono no puede tener más de ${TELEFONO_MAX} caracteres` });
+    }
+
+    await cliente.update({ telefono });
+    res.json(aRespuesta(cliente));
+  } catch (error) {
+    manejarError(res, error, 'Error al actualizar el perfil');
+  }
+};
+
 // GET /clientes/:dni
 const getClienteByDni = async (req, res) => {
   try {
@@ -97,10 +138,10 @@ const getClienteByDni = async (req, res) => {
   }
 };
 
-// POST /clientes - con crearCuenta: true también crea su cuenta (contraseña inicial: el DNI)
+// POST /clientes - crea el cliente y su cuenta (contraseña inicial: el DNI) en una transacción
 const createCliente = async (req, res) => {
   try {
-    const { dni, nombre, apellido, telefono, email, estado, crearCuenta: conCuenta } = req.body;
+    const { dni, nombre, apellido, telefono, email, estado } = req.body;
     const dniNum = toPositiveInt(dni);
     if (!dniNum) {
       return res.status(400).json({ message: 'dni es obligatorio y debe ser un entero positivo' });
@@ -108,40 +149,38 @@ const createCliente = async (req, res) => {
     if (!textoValido(nombre) || !textoValido(apellido)) {
       return res.status(400).json({ message: 'nombre y apellido son obligatorios' });
     }
-    const emailNorm = textoOpcional(email) && normalizarEmail(String(email));
-    if (emailNorm && !isValidEmail(emailNorm)) {
-      return res.status(400).json({ message: 'email inválido' });
+    // El email es el usuario con el que el cliente entra a la app
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: 'email es obligatorio y tiene que ser válido' });
     }
     if (estado !== undefined && typeof estado !== 'boolean') {
       return res.status(400).json({ message: 'estado debe ser true o false' });
     }
-    if (conCuenta !== undefined && typeof conCuenta !== 'boolean') {
-      return res.status(400).json({ message: 'crearCuenta debe ser true o false' });
-    }
-    if (conCuenta && !emailNorm) {
+    if ((textoOpcional(telefono) ?? '').length > TELEFONO_MAX) {
       return res
         .status(400)
-        .json({ message: 'Para darle acceso a la app el cliente necesita un email' });
+        .json({ message: `telefono no puede tener más de ${TELEFONO_MAX} caracteres` });
     }
+    const emailNorm = normalizarEmail(email);
 
     if (await Cliente.findByPk(dniNum)) {
       return res.status(409).json({ message: 'Ya existe un cliente con ese DNI' });
     }
-    if (conCuenta && (await emailEnUso(emailNorm))) {
+    if (await emailEnUso(emailNorm)) {
       return res.status(409).json({ message: 'Ya existe una cuenta con ese email' });
     }
 
     const { cliente, usuario } = await sequelize.transaction(async (transaction) => {
-      const usuario = conCuenta ? await crearCuenta(emailNorm, dniNum, transaction) : null;
+      const usuario = await crearCuenta(emailNorm, dniNum, transaction);
       const cliente = await Cliente.create(
         {
           dni: dniNum,
           nombre: nombre.trim(),
           apellido: apellido.trim(),
           telefono: textoOpcional(telefono),
-          email: emailNorm || null,
+          email: emailNorm,
           ...(estado !== undefined && { estado }),
-          idUsuario: usuario?.id ?? null
+          idUsuario: usuario.id
         },
         { transaction }
       );
@@ -154,40 +193,8 @@ const createCliente = async (req, res) => {
   }
 };
 
-// POST /clientes/:dni/cuenta - da acceso a un cliente que todavía no tiene cuenta
-const crearCuentaCliente = async (req, res) => {
-  try {
-    const dni = toPositiveInt(req.params.dni);
-    if (!dni) return res.status(400).json({ message: 'dni inválido' });
-
-    const cliente = await Cliente.findByPk(dni);
-    if (!cliente) return res.status(404).json({ message: 'No encontrado' });
-    if (cliente.idUsuario)
-      return res.status(409).json({ message: 'El cliente ya tiene una cuenta' });
-    if (!cliente.email || !isValidEmail(cliente.email)) {
-      return res
-        .status(400)
-        .json({ message: 'El cliente no tiene un email válido: cargalo antes de darle acceso' });
-    }
-    const email = normalizarEmail(cliente.email);
-    if (await emailEnUso(email)) {
-      return res.status(409).json({ message: 'Ya existe una cuenta con el email del cliente' });
-    }
-
-    await sequelize.transaction(async (transaction) => {
-      const usuario = await crearCuenta(email, dni, transaction);
-      await cliente.update({ idUsuario: usuario.id }, { transaction });
-    });
-    res
-      .status(201)
-      .json({ message: 'Cuenta creada. La contraseña inicial es el DNI del cliente.' });
-  } catch (error) {
-    manejarError(res, error, 'Error al crear la cuenta');
-  }
-};
-
-// PUT /clientes/:dni - admite nombre, apellido, telefono, email, estado y, si tiene cuenta,
-// activo (si puede entrar) y password (el admin le pone una nueva)
+// PUT /clientes/:dni - admite nombre, apellido, telefono, email, estado, activo (si puede entrar)
+// y password (el admin le pone una nueva)
 const updateCliente = async (req, res) => {
   try {
     const dni = toPositiveInt(req.params.dni);
@@ -195,7 +202,7 @@ const updateCliente = async (req, res) => {
 
     const cliente = await Cliente.findByPk(dni);
     if (!cliente) return res.status(404).json({ message: 'No encontrado' });
-    const usuario = cliente.idUsuario ? await Usuario.findByPk(cliente.idUsuario) : null;
+    const usuario = await Usuario.findByPk(cliente.idUsuario);
 
     const { nombre, apellido, telefono, email, estado, password, activo } = req.body;
     const cambiosCliente = {};
@@ -209,21 +216,22 @@ const updateCliente = async (req, res) => {
       cambiosCliente[campo] = valor.trim();
     }
 
-    if (telefono !== undefined) cambiosCliente.telefono = textoOpcional(telefono);
-
-    if (email !== undefined) {
-      const emailNorm = textoOpcional(email) && normalizarEmail(String(email));
-      if (emailNorm && !isValidEmail(emailNorm)) {
-        return res.status(400).json({ message: 'email inválido' });
-      }
-      if (!emailNorm && usuario) {
+    if (telefono !== undefined) {
+      const tel = textoOpcional(telefono);
+      if (tel !== null && tel.length > TELEFONO_MAX) {
         return res
           .status(400)
-          .json({ message: 'El cliente tiene cuenta: el email no puede quedar vacío' });
+          .json({ message: `telefono no puede tener más de ${TELEFONO_MAX} caracteres` });
       }
-      cambiosCliente.email = emailNorm || null;
+      cambiosCliente.telefono = tel;
+    }
+
+    if (email !== undefined) {
+      if (!isValidEmail(email)) return res.status(400).json({ message: 'email inválido' });
+      const emailNorm = normalizarEmail(email);
+      cambiosCliente.email = emailNorm;
       // El email del cliente es también el usuario con el que entra a la app
-      if (usuario && emailNorm !== usuario.email) {
+      if (emailNorm !== usuario.email) {
         if (await emailEnUso(emailNorm)) {
           return res.status(409).json({ message: 'Ya existe una cuenta con ese email' });
         }
@@ -236,10 +244,6 @@ const updateCliente = async (req, res) => {
         return res.status(400).json({ message: 'estado debe ser true o false' });
       }
       cambiosCliente.estado = estado;
-    }
-
-    if ((activo !== undefined || password !== undefined) && !usuario) {
-      return res.status(400).json({ message: 'El cliente no tiene cuenta: primero dale acceso' });
     }
 
     if (activo !== undefined) {
@@ -270,7 +274,7 @@ const updateCliente = async (req, res) => {
   }
 };
 
-// DELETE /clientes/:dni - borra el cliente y su cuenta, si tiene
+// DELETE /clientes/:dni - borra el cliente y su cuenta
 const deleteCliente = async (req, res) => {
   try {
     const dni = toPositiveInt(req.params.dni);
@@ -282,7 +286,7 @@ const deleteCliente = async (req, res) => {
     await sequelize.transaction(async (transaction) => {
       const { idUsuario } = cliente;
       await cliente.destroy({ transaction });
-      if (idUsuario) await Usuario.destroy({ where: { id: idUsuario }, transaction });
+      await Usuario.destroy({ where: { id: idUsuario }, transaction });
     });
     res.json({ message: 'Cliente eliminado' });
   } catch (error) {
@@ -292,9 +296,10 @@ const deleteCliente = async (req, res) => {
 
 module.exports = {
   getClientes,
+  getMiPerfil,
+  updateMiPerfil,
   getClienteByDni,
   createCliente,
-  crearCuentaCliente,
   updateCliente,
   deleteCliente
 };

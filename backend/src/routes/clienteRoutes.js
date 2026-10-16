@@ -2,9 +2,11 @@ const express = require('express');
 const router = express.Router();
 const {
   getClientes,
+  getMiPerfil,
+  updateMiPerfil,
   getClienteByDni,
   createCliente,
-  crearCuentaCliente,
+
   updateCliente,
   deleteCliente
 } = require('../controllers/clienteController');
@@ -16,13 +18,14 @@ const soloAdmin = authorize('admin');
 // pueden ver los datos de otros clientes
 const adminOProfesor = authorize('admin', 'profesor');
 
+// Los clientes solo acceden a su propio perfil. Tiene que ir antes que /:dni
+router.get('/me', authorize('cliente'), getMiPerfil);
+router.put('/me', authorize('cliente'), updateMiPerfil);
+
 router.get('/', adminOProfesor, getClientes);
 router.get('/:dni', adminOProfesor, getClienteByDni);
 router.post('/', soloAdmin, createCliente);
 router.put('/:dni', soloAdmin, updateCliente);
 router.delete('/:dni', soloAdmin, deleteCliente);
-
-// cuenta de acceso del cliente (contraseña inicial: su DNI)
-router.post('/:dni/cuenta', soloAdmin, crearCuentaCliente);
 
 module.exports = router;

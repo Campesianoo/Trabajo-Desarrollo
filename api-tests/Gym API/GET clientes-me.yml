@@ -1,11 +1,11 @@
 info:
-  name: POST cliente-cuenta
+  name: GET clientes-me
   type: http
-  seq: 21
+  seq: 20
 
 http:
-  method: POST
-  url: http://localhost:3000/api/clientes/40111222/cuenta
+  method: GET
+  url: http://localhost:3000/api/clientes/me
   auth: inherit
 
 settings:
