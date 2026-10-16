@@ -31,6 +31,9 @@ const textoOpcional = (valor) =>
     ? null
     : String(valor).trim();
 
+// Es lo que entra en la columna (STRING(30)); más largo daría un error de la base
+const TELEFONO_MAX = 30;
+
 const normalizarEmail = (email) => email.trim().toLowerCase();
 
 const emailEnUso = async (email) => Boolean(await Usuario.findOne({ where: { email } }));
@@ -80,6 +83,47 @@ const getClientes = async (req, res) => {
   }
 };
 
+// GET /clientes/me - el cliente que inició sesión ve sus propios datos
+const getMiPerfil = async (req, res) => {
+  try {
+    const cliente = await Cliente.findOne({
+      where: { idUsuario: req.user.id },
+      include: incluirUsuario
+    });
+    if (!cliente) return res.status(404).json({ message: 'No encontrado' });
+    res.json(aRespuesta(cliente));
+  } catch (error) {
+    sendError(res, 500, 'Error al obtener el perfil', error);
+  }
+};
+
+// PUT /clientes/me - el cliente solo puede cambiar su teléfono. El resto de sus datos (nombre,
+// email, DNI, acceso) los corrige el admin, porque afectan su cuenta y sus registros
+const updateMiPerfil = async (req, res) => {
+  try {
+    const cliente = await Cliente.findOne({
+      where: { idUsuario: req.user.id },
+      include: incluirUsuario
+    });
+    if (!cliente) return res.status(404).json({ message: 'No encontrado' });
+
+    if (!('telefono' in req.body)) {
+      return res.status(400).json({ message: 'Solo podés modificar tu teléfono' });
+    }
+    const telefono = textoOpcional(req.body.telefono);
+    if (telefono !== null && telefono.length > TELEFONO_MAX) {
+      return res
+        .status(400)
+        .json({ message: `telefono no puede tener más de ${TELEFONO_MAX} caracteres` });
+    }
+
+    await cliente.update({ telefono });
+    res.json(aRespuesta(cliente));
+  } catch (error) {
+    manejarError(res, error, 'Error al actualizar el perfil');
+  }
+};
+
 // GET /clientes/:dni
 const getClienteByDni = async (req, res) => {
   try {
@@ -111,6 +155,11 @@ const createCliente = async (req, res) => {
     }
     if (estado !== undefined && typeof estado !== 'boolean') {
       return res.status(400).json({ message: 'estado debe ser true o false' });
+    }
+    if ((textoOpcional(telefono) ?? '').length > TELEFONO_MAX) {
+      return res
+        .status(400)
+        .json({ message: `telefono no puede tener más de ${TELEFONO_MAX} caracteres` });
     }
     const emailNorm = normalizarEmail(email);
 
@@ -167,7 +216,15 @@ const updateCliente = async (req, res) => {
       cambiosCliente[campo] = valor.trim();
     }
 
-    if (telefono !== undefined) cambiosCliente.telefono = textoOpcional(telefono);
+    if (telefono !== undefined) {
+      const tel = textoOpcional(telefono);
+      if (tel !== null && tel.length > TELEFONO_MAX) {
+        return res
+          .status(400)
+          .json({ message: `telefono no puede tener más de ${TELEFONO_MAX} caracteres` });
+      }
+      cambiosCliente.telefono = tel;
+    }
 
     if (email !== undefined) {
       if (!isValidEmail(email)) return res.status(400).json({ message: 'email inválido' });
@@ -239,6 +296,8 @@ const deleteCliente = async (req, res) => {
 
 module.exports = {
   getClientes,
+  getMiPerfil,
+  updateMiPerfil,
   getClienteByDni,
   createCliente,
   updateCliente,
