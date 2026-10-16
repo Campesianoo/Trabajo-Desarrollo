@@ -240,6 +240,7 @@ No hay registro público: las cuentas las crea un admin. **Todo cliente y todo p
 | GET | `/api/auth/me` | Autenticado |
 | PUT | `/api/auth/password` `{ passwordActual, passwordNueva }` | Autenticado |
 | GET/POST/PUT/DELETE | `/api/usuarios` | Admin |
+| GET / PUT | `/api/clientes/me` (el PUT solo acepta `{ telefono }`) | Cliente (su propio perfil) |
 | GET | `/api/clientes`, `/api/clientes/:dni` | Admin, profesor |
 | POST | `/api/clientes` `{ dni, nombre, apellido, email, telefono?, estado? }` (crea también su cuenta) | Admin |
 | PUT | `/api/clientes/:dni` `{ nombre?, apellido?, telefono?, email?, estado?, password?, activo? }` (`password` y `activo` solo si tiene cuenta) | Admin |
