@@ -18,22 +18,7 @@ Diariamente los clientes ingresan a la aplicación para reservar un turno y real
 El gimnasio también administra las membresías de sus clientes y las rutinas que los profesores les asignan. Cada cliente y cada profesor entra con su propia cuenta, que crea el administrador.
 
 ### Modelo
-![imagen del modelo](LINK_AL_DIAGRAMA)
-
-```mermaid
-erDiagram
-    USUARIO ||--o| CLIENTE : "cuenta de"
-    USUARIO ||--o| PROFESOR : "cuenta de"
-    PROFESOR }o--o{ ESPECIALIDAD : "tiene"
-    CLIENTE ||--o{ MEMBRESIA : "paga"
-    CLIENTE ||--o{ RUTINA : "tiene asignadas"
-    PROFESOR ||--o{ RUTINA : "crea"
-    RUTINA ||--o{ EJERCICIO : "incluye"
-    TIPO_CLASE ||--o{ TURNO : "se dicta en"
-    TURNO }o--o{ PROFESOR : "lo dictan"
-    CLIENTE ||--o{ INSCRIPCION : "reserva"
-    TURNO ||--o{ INSCRIPCION : "recibe"
-```
+https://drive.google.com/file/d/1HqDRPvlI2g2nIOXbl4_dAGp7fi8ul_dJ/view?usp=sharing
 
 ## Alcance Funcional
 
