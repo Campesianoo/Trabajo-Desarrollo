@@ -55,6 +55,11 @@ erDiagram
     clientes ||--o{ Rutinas : "dniCliente (CASCADE)"
     Profesores ||--o{ Rutinas : "dniProfesor (NO ACTION)"
     Rutinas ||--o{ RutinaEjercicios : "idRutina (CASCADE)"
+    TiposClase ||--o{ Turnos : "idClase (RESTRICT)"
+    Turnos ||--o{ TurnoProfesores : "idTurno (CASCADE)"
+    Profesores ||--o{ TurnoProfesores : "dniProfesor (RESTRICT)"
+    Turnos ||--o{ InscripcionTurno : "idTurno (RESTRICT)"
+    clientes ||--o{ InscripcionTurno : "dniCliente (CASCADE)"
 
     Usuarios {
         int id PK
@@ -109,6 +114,32 @@ erDiagram
         string repeticiones
         int descanso
     }
+    TiposClase {
+        bigint idClase PK
+        text nombre
+        text descripcion
+    }
+    Turnos {
+        bigint idTurno PK
+        bigint idClase FK
+        date fecha "null = plantilla diaria"
+        time horaInicio
+        time horaFin
+        int capacidadMaxima
+        text estado
+    }
+    TurnoProfesores {
+        bigint id PK
+        bigint idTurno FK
+        int dniProfesor FK
+    }
+    InscripcionTurno {
+        bigint idInscripcion PK
+        bigint idTurno FK
+        int dniCliente FK
+        timestamptz fechaHoraInscripcion
+        text estado "activa, cancelada, asistio, ausente"
+    }
 ```
 
 ### Reglas de borrado
@@ -119,6 +150,10 @@ erDiagram
 | un **profesor** sin rutinas | se borra con su cuenta |
 | un **profesor con rutinas** | se rechaza con `409`: las rutinas también son del cliente |
 | una **rutina** | se borran sus ejercicios |
+| un **cliente** con inscripciones | se borran también sus inscripciones |
+| un **profesor asignado a turnos** | se rechaza con `409` |
+| un **tipo de clase con turnos** | se rechaza con `409` |
+| un **turno con inscripciones** | se rechaza con `409` |
 
 ### Lo que no se guarda: el estado de la membresía
 
@@ -134,6 +169,16 @@ flowchart TD
     C -->|no| Ac[Activa]
 ```
 
-### Clases y turnos (en desarrollo)
+### Clases y turnos
 
-Las tablas de clases las está desarrollando otro integrante en su rama: `TiposClase`, `Turnos`, `TurnoProfesores` e `InscripcionTurno`. Cuando se integren se agregan a este diagrama. Ver [migraciones](migraciones.md#ramas-que-agregan-tablas).
+Un **tipo de clase** tiene **turnos**; un turno tiene uno o más **profesores** y recibe **inscripciones** de clientes. Un turno sin fecha es una **plantilla**: el backend genera a partir de ella los turnos de los próximos 30 días.
+
+```mermaid
+flowchart LR
+    P[Plantilla<br/>turno sin fecha] -->|genera cada día| T[Turnos de los próximos 30 días]
+    T --> I{Cliente se inscribe}
+    I -->|"≥ 8 h antes · 1 por día · hay lugar"| OK[Inscripción activa]
+    I -->|no cumple| X[409 con el motivo]
+    OK -->|el día del turno| A[Profesor marca<br/>asistió / ausente]
+    OK -->|el cliente cancela| C[Cancelada<br/>libera el lugar]
+```

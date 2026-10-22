@@ -13,6 +13,7 @@
 | [#6](https://github.com/Campesianoo/Trabajo-Desarrollo/pull/6) | `fix/revision-backend` | Revisión del backend: migraciones, validaciones, cuenta obligatoria para clientes y profesores | Mergeado |
 | [#7](https://github.com/Campesianoo/Trabajo-Desarrollo/pull/7) | `feature/perfil-cliente` | Perfil del cliente (`/clientes/me`) | Mergeado |
 | [#8](https://github.com/Campesianoo/Trabajo-Desarrollo/pull/8) | `feature/clientes-listado-membresia` | Estado de membresía en el listado de clientes | Mergeado |
+| [#9](https://github.com/Campesianoo/Trabajo-Desarrollo/pull/9) | `feature-Turnos` | Clases, turnos, inscripciones, plantillas diarias y asistencia (con su migración) | En revisión |
 
 ### Frontend – [IanKasperczak/Trabajo-Desarrollo-Frontend](https://github.com/IanKasperczak/Trabajo-Desarrollo-Frontend/pulls?q=is%3Apr)
 
@@ -38,9 +39,9 @@
 | CRUD Rutina (de Cliente y Profesor) con ejercicios | ✅ | ✅ |
 | Listado de clientes con estado de membresía + detalle con su rutina | ✅ | ✅ |
 | Perfil propio (cliente y profesor) | ✅ | ✅ |
-| Clases, turnos e inscripciones | 🚧 rama de Mati | ⏳ |
-| Listado "Clases del día" con detalle | ⏳ | ⏳ |
-| CUU: reservar turno / registrar asistencia | ⏳ | ⏳ |
+| Clases, turnos e inscripciones | ✅ | ✅ |
+| Listado "Clases del día" con detalle de inscriptos | ✅ | ✅ |
+| CUU: reservar turno / registrar asistencia | ✅ | ✅ |
 | Tests automáticos | ✅ | ✅ |
 | Documentación | ✅ | ✅ |
 | Deploy con cuentas de demostración | 🚧 | 🚧 |
@@ -63,7 +64,6 @@
 
 ## Pendientes conocidos
 
-- Integrar la rama de clases y turnos (debe traer su migración, ver [migraciones](migraciones.md#ramas-que-agregan-tablas)).
 - Actualizar la propuesta (`proposal.md`): quitar Salón y la sección de adicionales heredada de otra plantilla.
 - Test end-to-end con Playwright.
 - Revisar las vulnerabilidades que reporta `npm audit` en el frontend.
