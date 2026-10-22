@@ -5,47 +5,62 @@
 * 50390 - Cabardos, Matias <br>
   52331 - Degiovanni, Bianca <br>
   52199 - Kasperczak, Ian <br>
-  51350 -  Docheff, Valentino <br>
 
 ### Repositorios
-* [frontend app](http://hyperlinkToGihubOrGitlab)
-* [backend app](http://hyperlinkToGihubOrGitlab)
+* [frontend app](https://github.com/IanKasperczak/Trabajo-Desarrollo-Frontend)
+* [backend app](https://github.com/Campesianoo/Trabajo-Desarrollo)
 
 
 ## Tema
 ### Descripción
-El gimnasio Power Trainer nos convocó para realizar un sistema que permita administrar el flujo de personas en el mismo. 
-Diariamente los clientes ingresan a la aplicación para reservar un turno y realizar actividades dentro del gimnasio. A lo largo del día los profesores del gimnasio dictan dos tipos de clases: musculación y crossfit. Cada clase tiene una cantidad de cupos limitados para un determinado día y horario, es por ello que los clientes deberán anotarse con anticipación.   
-
+El gimnasio Power Trainer nos convocó para realizar un sistema que permita administrar el flujo de personas en el mismo.
+Diariamente los clientes ingresan a la aplicación para reservar un turno y realizar actividades dentro del gimnasio. A lo largo del día los profesores dictan distintas clases, que el gimnasio define a su gusto (por ejemplo musculación, crossfit o funcional). Cada clase tiene una cantidad de cupos limitados para un determinado día y horario, es por ello que los clientes deberán anotarse con anticipación.
+El gimnasio también administra las membresías de sus clientes y las rutinas que los profesores les asignan. Cada cliente y cada profesor entra con su propia cuenta, que crea el administrador.
 
 ### Modelo
-(https://drive.google.com/file/d/1_nS8bmaKZF69zily-P3Q4HlUUluL-mYP/view?usp=sharing)
+![imagen del modelo](LINK_AL_DIAGRAMA)
 
-## Alcance Funcional 
+```mermaid
+erDiagram
+    USUARIO ||--o| CLIENTE : "cuenta de"
+    USUARIO ||--o| PROFESOR : "cuenta de"
+    PROFESOR }o--o{ ESPECIALIDAD : "tiene"
+    CLIENTE ||--o{ MEMBRESIA : "paga"
+    CLIENTE ||--o{ RUTINA : "tiene asignadas"
+    PROFESOR ||--o{ RUTINA : "crea"
+    RUTINA ||--o{ EJERCICIO : "incluye"
+    TIPO_CLASE ||--o{ TURNO : "se dicta en"
+    TURNO }o--o{ PROFESOR : "lo dictan"
+    CLIENTE ||--o{ INSCRIPCION : "reserva"
+    TURNO ||--o{ INSCRIPCION : "recibe"
+```
+
+## Alcance Funcional
+
+### Alcance Mínimo
+
+Regularidad:
 |Req|Detalle|
 |:-|:-|
-|CRUD simple|1. CRUD Cliente <br>2. CRUD Profesor <br>3. CRUD Salon <br>4. CRUD Especialidad|
-|CRUD dependiente|1. CRUD Actividad {depende de} CRUD Profesor y CRUD Salon <br>2. CRUD Membresia {depende de} CRUD Cliente  <br>3. CURD Rutina {depende de} CRUD Cliente y CRUD Profesor|
-|Listado<br>+<br>detalle| 1. Listado de Clientes Muestra la lista de clientes junto al estado de la membresía => El Detalle muestra los datos del cliente y su Rutina asignada. <br> 2. Listado de clases del dia => detalle muestra los clientes anotados en la clase|
-|CUU/Epic|CUU_1  Reservar turno para realizar una actividad en un determinado día y horario.<br> CUU2_ Registrar asistencia del alumno a la clase|
+|CRUD simple|1. CRUD Cliente<br>2. CRUD Profesor<br>3. CRUD Especialidad<br>4. CRUD Tipo de Clase|
+|CRUD dependiente|1. CRUD Turno {depende de} CRUD Tipo de Clase y CRUD Profesor<br>2. CRUD Membresía {depende de} CRUD Cliente<br>3. CRUD Rutina {depende de} CRUD Cliente y CRUD Profesor|
+|Listado<br>+<br>detalle|1. Listado de clientes, muestra nombre, DNI y el estado de la membresía (activa, por vencer, vencida o sin membresía) => detalle muestra los datos del cliente y su rutina asignada<br>2. Listado de clases del día filtrado por fecha, muestra clase, horario, profesores y lugares ocupados => detalle muestra los clientes anotados en la clase|
+|CUU/Epic|1. Reservar un turno para realizar una actividad en un determinado día y horario (con una membresía vigente que cubra el día del turno, al menos 8 horas de anticipación, un turno por día y mientras haya cupo)<br>2. Registrar la asistencia del cliente a la clase|
 
-La data registrada por el CUU_1 sirve como Input para el CUU_2.
+La data registrada por el CUU 1 sirve como input para el CUU 2.
 
 
 Adicionales para Aprobación
 |Req|Detalle|
 |:-|:-|
-|CRUD |1. CRUD Tipo Habitacion<br>2. CRUD Servicio<br>3. CRUD Localidad<br>4. CRUD Provincia<br>5. CRUD Habitación<br>6. CRUD Empleado<br>7. CRUD Cliente|
-|CUU/Epic|1. Reservar una habitación para la estadía<br>2. Realizar el check-in de una reserva<br>3. Realizar el check-out y facturación de estadía y servicios|
+|CRUD|1. CRUD Cliente<br>2. CRUD Profesor<br>3. CRUD Especialidad<br>4. CRUD Tipo de Clase<br>5. CRUD Turno<br>6. CRUD Membresía<br>7. CRUD Rutina<br>8. CRUD Usuario (cuentas y roles)|
+|CUU/Epic|1. Reservar un turno para realizar una actividad en un determinado día y horario<br>2. Registrar la asistencia del cliente a la clase<br>3. Cancelar una reserva (el cliente libera su lugar)|
 
 
 ### Alcance Adicional Voluntario
 
-*Nota*: El Alcance Adicional Voluntario es opcional, pero ayuda a que la funcionalidad del sistema esté completa y será considerado en la nota en función de su complejidad y esfuerzo.
-
 |Req|Detalle|
 |:-|:-|
-|Listados |1. Estadía del día filtrado por fecha muestra, cliente, habitaciones y estado <br>2. Reservas filtradas por cliente muestra datos del cliente y de cada reserve fechas, estado cantidad de habitaciones y huespedes|
-|CUU/Epic|1. Consumir servicios<br>2. Cancelación de reserva|
-|Otros|1. Envío de recordatorio de reserva por email|
-
+|Listados|1. Membresías filtradas por estado y por cliente, con aviso de las que están por vencer<br>2. Reservas del cliente: próximas clases e historial con su asistencia|
+|CUU/Epic|1. Turnos que se repiten todos los días (el sistema genera los de los próximos 30 días)|
+|Otros|1. Login con roles (administrador, profesor y cliente) y rutas protegidas según el rol<br>2. Avisos para el administrador: membresías por vencer y clientes sin membresía vigente o sin rutina<br>3. Modo claro y oscuro|

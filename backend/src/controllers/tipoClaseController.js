@@ -1,5 +1,5 @@
 const TipoClase = require('../models/tipoClase');
-const { toPositiveInt, sendError } = require('../utils/http');
+const { toPositiveInt, sendError, esErrorDeReferencia } = require('../utils/http');
 
 const getTiposClase = async (req, res) => {
   try {
@@ -87,7 +87,7 @@ const deleteTipoClase = async (req, res) => {
     await tipo.destroy();
     res.json({ message: 'Tipo de clase eliminado' });
   } catch (error) {
-    if (error.name === 'SequelizeForeignKeyConstraintError') {
+    if (esErrorDeReferencia(error)) {
       return res.status(409).json({
         message: 'No se puede eliminar: el tipo de clase tiene turnos asociados'
       });

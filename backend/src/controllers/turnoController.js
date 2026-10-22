@@ -1,4 +1,4 @@
-const { Op } = require('sequelize');
+const { Op, fn, col } = require('sequelize');
 const sequelize = require('../config/database');
 const {
   Cliente,
@@ -13,6 +13,12 @@ const { toPositiveInt, sendError } = require('../utils/http');
 const ZONA_HORARIA = 'America/Argentina/Buenos_Aires';
 const DIAS_GENERACION = 30;
 const ESTADO_CANCELADA = 'cancelada';
+const ESTADOS_ASISTENCIA = ['activa', 'asistio', 'ausente'];
+
+// Una inscripción cuenta para el cupo mientras no esté cancelada (asistió y ausente también cuentan)
+const estadoVigente = {
+  [Op.or]: [{ estado: null }, { estado: { [Op.ne]: ESTADO_CANCELADA } }]
+};
 
 const getPartesFecha = (fecha) => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fecha);
@@ -134,6 +140,27 @@ const includeTurno = (req, includeInscripciones = true) => {
   return include;
 };
 
+// Agrega a cada turno cuántos inscriptos vigentes tiene (el cliente solo recibe su propia
+// inscripción, así que no puede calcular el cupo por su cuenta)
+const conInscriptos = async (turnos) => {
+  const lista = Array.isArray(turnos) ? turnos : [turnos];
+  const ids = lista.map((turno) => turno.idTurno);
+  const conteos = ids.length
+    ? await InscripcionTurno.findAll({
+        attributes: ['idTurno', [fn('COUNT', col('idInscripcion')), 'total']],
+        where: { idTurno: { [Op.in]: ids }, ...estadoVigente },
+        group: ['idTurno'],
+        raw: true
+      })
+    : [];
+  const porTurno = new Map(conteos.map((fila) => [Number(fila.idTurno), Number(fila.total)]));
+  const resultado = lista.map((turno) => ({
+    ...turno.toJSON(),
+    inscriptos: porTurno.get(Number(turno.idTurno)) ?? 0
+  }));
+  return Array.isArray(turnos) ? resultado : resultado[0];
+};
+
 const cargarClienteDeSesion = async (req) => {
   if (req.user.rol !== 'cliente') return null;
   const cliente = await Cliente.findOne({
@@ -141,6 +168,20 @@ const cargarClienteDeSesion = async (req) => {
     attributes: ['dni']
   });
   return cliente ? toPositiveInt(cliente.dni) : null;
+};
+
+// Los turnos del día se generan a partir de las plantillas (turnos sin fecha). Se hace una vez por
+// día, o cuando se crea, modifica o borra una plantilla, y no en cada pedido
+let diaGenerado = null;
+const marcarPlantillasModificadas = () => {
+  diaGenerado = null;
+};
+
+const asegurarTurnosGenerados = async () => {
+  const hoy = fechaBuenosAires();
+  if (diaGenerado === hoy) return;
+  await generarTurnosDiarios();
+  diaGenerado = hoy;
 };
 
 const generarTurnosDiarios = async () => {
@@ -156,7 +197,9 @@ const generarTurnosDiarios = async () => {
     const horaFin = parseHora(String(plantilla.horaFin || ''));
     const capacidad = toPositiveInt(plantilla.capacidadMaxima);
     if (!horaInicio || !horaFin || horaFin <= horaInicio || !capacidad) {
-      throw new Error(`La plantilla de turno ${plantilla.idTurno} tiene datos inválidos`);
+      // Una plantilla mal cargada no tiene que romper el listado de turnos para todos
+      console.warn(`La plantilla de turno ${plantilla.idTurno} tiene datos inválidos: se omite`);
+      continue;
     }
 
     await sequelize.transaction(async (transaction) => {
@@ -279,7 +322,7 @@ const getTurnos = async (req, res) => {
   try {
     req.dniCliente = await cargarClienteDeSesion(req);
     if (req.user.rol === 'cliente' && !req.dniCliente) return res.json([]);
-    await generarTurnosDiarios();
+    await asegurarTurnosGenerados();
 
     const where = { fecha: { [Op.not]: null } };
     if (req.query.fecha !== undefined) {
@@ -314,7 +357,7 @@ const getTurnos = async (req, res) => {
         ['idTurno', 'ASC']
       ]
     });
-    res.json(turnos);
+    res.json(await conInscriptos(turnos));
   } catch (error) {
     sendError(res, 500, 'Error al obtener los turnos', error);
   }
@@ -348,7 +391,7 @@ const getTurnoById = async (req, res) => {
     if (req.user.rol === 'cliente' && turno.fecha === null) {
       return res.status(404).json({ message: 'Turno no encontrado' });
     }
-    res.json(turno);
+    res.json(await conInscriptos(turno));
   } catch (error) {
     sendError(res, 500, 'Error al obtener el turno', error);
   }
@@ -379,10 +422,11 @@ const createTurno = async (req, res) => {
       }
       return nuevoTurno;
     });
+    if (turno.fecha === null) marcarPlantillasModificadas();
     const completo = await Turno.findByPk(turno.idTurno, {
       include: includeTurno({ user: { rol: 'admin' } })
     });
-    res.status(201).json(completo);
+    res.status(201).json(await conInscriptos(completo));
   } catch (error) {
     sendError(res, 500, 'Error al crear el turno', error);
   }
@@ -412,10 +456,7 @@ const updateTurno = async (req, res) => {
     }
     const capacidad = parsed.values.capacidadMaxima ?? turno.capacidadMaxima;
     const inscripcionesActivas = await InscripcionTurno.count({
-      where: {
-        idTurno,
-        [Op.or]: [{ estado: null }, { estado: { [Op.ne]: ESTADO_CANCELADA } }]
-      }
+      where: { idTurno, ...estadoVigente }
     });
     if (capacidad !== null && capacidad < inscripcionesActivas) {
       return res.status(409).json({
@@ -435,10 +476,11 @@ const updateTurno = async (req, res) => {
         }
       }
     });
+    if (turno.fecha === null) marcarPlantillasModificadas();
     const completo = await Turno.findByPk(idTurno, {
       include: includeTurno({ user: { rol: 'admin' } })
     });
-    res.json(completo);
+    res.json(await conInscriptos(completo));
   } catch (error) {
     sendError(res, 500, 'Error al actualizar el turno', error);
   }
@@ -461,6 +503,7 @@ const deleteTurno = async (req, res) => {
       await TurnoProfesor.destroy({ where: { idTurno }, transaction });
       await turno.destroy({ transaction });
     });
+    if (turno.fecha === null) marcarPlantillasModificadas();
     res.json({ message: 'Turno eliminado' });
   } catch (error) {
     sendError(res, 500, 'Error al eliminar el turno', error);
@@ -512,5 +555,8 @@ module.exports = {
   getInscripcionesTurno,
   cargarClienteDeSesion,
   fechaHoraLocalAUTC,
-  ESTADO_CANCELADA
+  fechaBuenosAires,
+  ESTADO_CANCELADA,
+  ESTADOS_ASISTENCIA,
+  estadoVigente
 };

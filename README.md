@@ -169,6 +169,10 @@ Durante la evaluación de cada entrega se considerarán:
 * Innovación, investigación y desafíos asumidos.
 * Documentación solicitada.
 
+## Documentación del proyecto
+
+Instalación, arquitectura, API, decisiones de diseño, tests, seguimiento y deploy están en [`docs/`](docs/README.md).
+
 ## 6. FAQ
 
 En la sección de [FAQ](FAQ.md) podrán encontrar respuestas a las consultas más frecuentes que se van realizando.
@@ -192,6 +196,23 @@ Ejemplo de `.env`:
 DATABASE_URL=postgresql://postgres.xxxx:password@aws-0-xx.pooler.supabase.com:6543/postgres
 ```
 
+### Base de datos y migraciones
+
+El esquema de la base se maneja con **migraciones** (carpeta `backend/migrations`, con [Umzug](https://github.com/sequelize/umzug)). El servidor aplica las pendientes al arrancar, así que en el deploy no hay que hacer nada extra. Ya **no se usa `sequelize.sync()`**: solo crea tablas nuevas y nunca modifica las existentes, por eso la base de producción había quedado distinta de los modelos.
+
+| Comando | Qué hace |
+| --- | --- |
+| `pnpm run migrate` | Aplica las migraciones pendientes |
+| `pnpm run migrate:status` | Muestra cuáles están aplicadas y cuáles pendientes |
+| `pnpm run migrate:down` | Revierte la última (la del esquema inicial no se puede revertir) |
+
+**Para cambiar el esquema** (tabla nueva, columna nueva, restricción, etc.):
+1. Crear un archivo nuevo en `backend/migrations` con el formato `AAAAMMDD-NN-descripcion.js` (se aplican en orden alfabético), con una función `up` y una `down`. Ver los existentes como ejemplo.
+2. Actualizar el modelo de Sequelize para que coincida con la migración.
+3. **No editar una migración que ya se aplicó**: si hay que corregir algo, se hace con otra migración.
+
+**Desarrollar contra una base propia, no contra la compartida.** Una rama con cambios de esquema que se corre contra la base de Supabase la modifica para todos (así quedaron duplicadas las tablas `Membresia` y `membresia`). Para una base local alcanza con un PostgreSQL instalado y las variables `DB_NAME`, `DB_USER`, `DB_PASS`, `DB_HOST` y `DB_PORT` en el `.env` en lugar de `DATABASE_URL`. Al arrancar, las migraciones crean todas las tablas.
+
 ## 8. Autenticación
 
 El backend usa login propio con **JWT guardado en una cookie httpOnly** (JavaScript no puede leerla, así que un XSS no puede robar la sesión). Las contraseñas se guardan hasheadas con bcrypt.
@@ -203,9 +224,9 @@ El backend usa login propio con **JWT guardado en una cookie httpOnly** (JavaScr
 | `profesor` | Consultar profesores, especialidades y clientes (su cuenta está vinculada a un profesor por `dniProfesor`) |
 | `cliente` | Consultar profesores y especialidades (su cuenta está vinculada a un cliente por `clientes.idUsuario`) |
 
-No hay registro público: las cuentas las crea un admin.
-- **Clientes:** al darlo de alta con `POST /api/clientes` y `crearCuenta: true` (necesita email), o después con `POST /api/clientes/:dni/cuenta`. El email del cliente es el usuario con el que entra.
-- **Profesores:** al darlo de alta con `POST /api/profesores` y `crearCuenta: true`, o después con `POST /api/profesores/:dni/cuenta`.
+No hay registro público: las cuentas las crea un admin. **Todo cliente y todo profesor tiene cuenta**: se crea junto con él al darlo de alta, y se borra con él.
+- **Clientes:** `POST /api/clientes` (el email es obligatorio: es el usuario con el que entra).
+- **Profesores:** `POST /api/profesores` (su email es el usuario con el que entra).
 - **Admins:** desde `POST /api/usuarios`.
 
 **Primer ingreso:** si no se indica otra, la contraseña inicial de clientes y profesores es su **DNI**. Toda cuenta creada por un admin queda con `debeCambiarPassword: true` (lo devuelven `login` y `GET /api/auth/me`), y lo mismo pasa si el admin le cambia la contraseña a alguien. No bloquea nada: el frontend lo usa para recordarle al usuario que elija su propia contraseña desde Configuración (`PUT /api/auth/password`), y al hacerlo vuelve a `false`.
@@ -223,13 +244,12 @@ No hay registro público: las cuentas las crea un admin.
 | GET | `/api/auth/me` | Autenticado |
 | PUT | `/api/auth/password` `{ passwordActual, passwordNueva }` | Autenticado |
 | GET/POST/PUT/DELETE | `/api/usuarios` | Admin |
+| GET / PUT | `/api/clientes/me` (el PUT solo acepta `{ telefono }`) | Cliente (su propio perfil) |
 | GET | `/api/clientes`, `/api/clientes/:dni` | Admin, profesor |
-| POST | `/api/clientes` `{ dni, nombre, apellido, telefono?, email?, estado?, crearCuenta? }` (con `crearCuenta: true` también crea su cuenta) | Admin |
-| POST | `/api/clientes/:dni/cuenta` (da acceso a un cliente existente) | Admin |
+| POST | `/api/clientes` `{ dni, nombre, apellido, email, telefono?, estado? }` (crea también su cuenta) | Admin |
 | PUT | `/api/clientes/:dni` `{ nombre?, apellido?, telefono?, email?, estado?, password?, activo? }` (`password` y `activo` solo si tiene cuenta) | Admin |
 | DELETE | `/api/clientes/:dni` (borra también su cuenta, si tiene) | Admin |
-| POST | `/api/profesores` `{ ..., crearCuenta? }` (con `crearCuenta: true` también crea su cuenta) | Admin |
-| POST | `/api/profesores/:dni/cuenta` (da acceso a un profesor existente) | Admin |
+| POST | `/api/profesores` `{ dni, nombre, apellido, telefono, email }` (crea también su cuenta) | Admin |
 | DELETE | `/api/profesores/:dni` (borra también su cuenta, si tiene) | Admin |
 
 ### Integración con el frontend
@@ -251,6 +271,20 @@ El backend expone los siguientes endpoints para gestionar rutinas y ejercicios a
 - `DELETE /api/rutinas/:id/ejercicios/:idEjercicio` — elimina un ejercicio.
 
 Los ids de rutina y ejercicio se manejan como enteros positivos y las referencias a cliente/profesor deben existir; si no existen, la API responde `400` para evitar datos huérfanos.
+
+### CRUD de membresías
+Cada pago de un cliente es una membresía (`fechaPago`, `fechaInicio`, `fechaVencimiento`, `valor`). El **estado no se guarda**: se calcula con las fechas y la respuesta lo incluye como `estado`: `Pendiente` (todavía no empezó), `Activa`, `Por vencer` (vence en 7 días o menos) o `Vencida`.
+
+| Método | Ruta | Acceso |
+| --- | --- | --- |
+| GET | `/api/membresias` | Admin (todas) y cliente (solo las suyas). El profesor no tiene acceso |
+| GET | `/api/membresias/:id` | Admin y cliente (solo las suyas) |
+| GET | `/api/membresias/cliente/:dni` | Admin |
+| POST | `/api/membresias` `{ dniCliente, fechaPago, fechaInicio, fechaVencimiento, valor }` | Admin |
+| PUT | `/api/membresias/:id` `{ fechaPago?, fechaInicio?, fechaVencimiento?, valor? }` | Admin |
+| DELETE | `/api/membresias/:id` | Admin |
+
+Las fechas van como `AAAA-MM-DD` y tienen que existir; `fechaInicio` no puede ser posterior a `fechaVencimiento` y `valor` va de 0 a 99999999.99. El cliente de una membresía no se puede cambiar: si se cargó mal, se elimina y se crea de nuevo.
 
 ### Variables en el deploy (Render)
 | Variable | Valor |

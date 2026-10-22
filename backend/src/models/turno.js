@@ -14,7 +14,7 @@ const Turno = sequelize.define(
       type: DataTypes.BIGINT,
       allowNull: false,
       references: {
-        model: { tableName: 'TiposClase', schema: 'public' },
+        model: 'TiposClase',
         key: 'idClase'
       },
       field: 'idClase'
@@ -47,10 +47,7 @@ const Turno = sequelize.define(
   },
   {
     tableName: 'Turnos',
-    freezeTableName: true,
-    schema: 'public',
-    createdAt: 'createdAT',
-    updatedAt: 'updatedAT'
+    freezeTableName: true
   }
 );
 

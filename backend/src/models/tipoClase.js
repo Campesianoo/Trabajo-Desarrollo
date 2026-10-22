@@ -23,10 +23,7 @@ const TipoClase = sequelize.define(
   },
   {
     tableName: 'TiposClase',
-    freezeTableName: true,
-    schema: 'public',
-    createdAt: 'createdAt',
-    updatedAt: 'updatedAt'
+    freezeTableName: true
   }
 );
 

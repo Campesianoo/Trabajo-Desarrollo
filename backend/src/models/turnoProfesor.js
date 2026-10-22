@@ -14,7 +14,7 @@ const TurnoProfesor = sequelize.define(
       type: DataTypes.BIGINT,
       allowNull: false,
       references: {
-        model: { tableName: 'Turnos', schema: 'public' },
+        model: 'Turnos',
         key: 'idTurno'
       },
       field: 'idTurno'
@@ -23,7 +23,7 @@ const TurnoProfesor = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
       references: {
-        model: { tableName: 'Profesores', schema: 'public' },
+        model: 'Profesores',
         key: 'dni'
       },
       field: 'dniProfesor'
@@ -31,10 +31,7 @@ const TurnoProfesor = sequelize.define(
   },
   {
     tableName: 'TurnoProfesores',
-    freezeTableName: true,
-    schema: 'public',
-    createdAt: 'createdAt',
-    updatedAt: 'updatedAt'
+    freezeTableName: true
   }
 );
 

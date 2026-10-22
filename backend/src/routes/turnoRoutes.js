@@ -15,7 +15,11 @@ const {
   updateTipoClase,
   deleteTipoClase
 } = require('../controllers/tipoClaseController');
-const { inscribirse, cancelarInscripcion } = require('../controllers/inscripcionTurnoController');
+const {
+  inscribirse,
+  cancelarInscripcion,
+  registrarAsistencia
+} = require('../controllers/inscripcionTurnoController');
 const { authenticate, authorize } = require('../middlewares/auth');
 
 const router = Router();
@@ -35,6 +39,7 @@ router.get('/', getTurnos);
 router.get('/:id/inscripciones', adminOProfesor, getInscripcionesTurno);
 router.post('/:id/inscripciones', authorize('cliente'), inscribirse);
 router.delete('/:id/inscripciones', authorize('cliente'), cancelarInscripcion);
+router.put('/:id/inscripciones/:dniCliente', adminOProfesor, registrarAsistencia);
 router.get('/:id', getTurnoById);
 router.post('/', soloAdmin, createTurno);
 router.put('/:id', soloAdmin, updateTurno);
