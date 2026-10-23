@@ -33,13 +33,14 @@ Regularidad:
 |CUU/Epic|1. Reservar un turno para realizar una actividad en un determinado día y horario (con una membresía vigente que cubra el día del turno, al menos 8 horas de anticipación, un turno por día y mientras haya cupo)<br>2. Registrar la asistencia del cliente a la clase|
 
 La data registrada por el CUU 1 sirve como input para el CUU 2.
+Para aprobación, la membresía que registra el CUU 3 es la que habilita al cliente a reservar un turno (CUU 1).
 
 
 Adicionales para Aprobación
 |Req|Detalle|
 |:-|:-|
 |CRUD|1. CRUD Cliente<br>2. CRUD Profesor<br>3. CRUD Especialidad<br>4. CRUD Tipo de Clase<br>5. CRUD Turno<br>6. CRUD Membresía<br>7. CRUD Rutina<br>8. CRUD Usuario (cuentas y roles)|
-|CUU/Epic|1. Reservar un turno para realizar una actividad en un determinado día y horario<br>2. Registrar la asistencia del cliente a la clase<br>3. Cancelar una reserva (el cliente libera su lugar)|
+|CUU/Epic|1. Reservar un turno para realizar una actividad en un determinado día y horario<br>2. Registrar la asistencia del cliente a la clase<br>3. Renovar la membresía de un cliente (el sistema calcula las fechas y el administrador registra el pago)|
 
 
 ### Alcance Adicional Voluntario
@@ -47,5 +48,5 @@ Adicionales para Aprobación
 |Req|Detalle|
 |:-|:-|
 |Listados|1. Membresías filtradas por estado y por cliente, con aviso de las que están por vencer<br>2. Reservas del cliente: próximas clases e historial con su asistencia|
-|CUU/Epic|1. Turnos que se repiten todos los días (el sistema genera los de los próximos 30 días)|
+|CUU/Epic|1. Cancelar una reserva (el cliente libera su lugar)<br>2. Turnos que se repiten todos los días (el sistema genera los de los próximos 30 días)|
 |Otros|1. Login con roles (administrador, profesor y cliente) y rutas protegidas según el rol<br>2. Avisos para el administrador: membresías por vencer y clientes sin membresía vigente o sin rutina<br>3. Modo claro y oscuro|

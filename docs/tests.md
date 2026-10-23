@@ -4,8 +4,8 @@ Los dos repositorios usan [Vitest](https://vitest.dev). Última ejecución compl
 
 | Repo | Archivos | Tests | Resultado |
 |:-|:-:|:-:|:-:|
-| Backend | 6 | 94 | ✅ 94 pasaron |
-| Frontend | 6 | 41 | ✅ 41 pasaron |
+| Backend | 8 | 112 | ✅ 112 pasaron |
+| Frontend | 7 | 46 | ✅ 46 pasaron |
 
 ## Cómo correrlos
 
@@ -32,6 +32,7 @@ Usa [supertest](https://github.com/ladjs/supertest) para llamar a la API real (l
 | `http.test.js` | `toPositiveInt`, `isValidEmail`, `esErrorDeReferencia` (entradas válidas e inválidas) |
 | `membresia.test.js` | `fechaValida` (rechaza `2026-02-30`, años no bisiestos, formatos raros), `valorValido` (rangos, redondeo a 2 decimales), `calcularEstado` (Pendiente / Activa / Por vencer / Vencida, incluidos los bordes) |
 | `password.test.js` | Largo mínimo y máximo, hash y verificación, usuario inexistente |
+| `renovacion.test.js` | Suma de días y fechas de la renovación (sin membresías, al día, vence hoy, vencida) |
 
 ### Integración (`backend/tests/integration`)
 
@@ -39,6 +40,7 @@ Usa [supertest](https://github.com/ladjs/supertest) para llamar a la API real (l
 |:-|:-|
 | `auth.test.js` | Login correcto (cookie `httpOnly`), mismo `401` para email inexistente y contraseña incorrecta, `/auth/me` sin y con sesión, rechazo de un origen no permitido (CSRF), logout |
 | `clientes-membresias.test.js` | Alta de cliente (crea la cuenta con contraseña = DNI), DNI repetido `409`, email inválido `400`, permisos por rol (`403`), estado de la membresía según las fechas, el profesor no ve membresías, el cliente solo ve las suyas, listado de clientes con `membresia` (y sin ese campo para el profesor), borrado en cascada |
+| `renovacion.test.js` | Renovar membresía: la propuesta (primera vez, al día, vencida), alta con importe, encadenado sin huecos ni superposiciones, validaciones, permisos (`403`) y que después de renovar el cliente pueda reservar |
 | `turnos.test.js` | Tipos de clase y turnos (validaciones y permisos), plantillas que generan 30 días sin duplicarse, inscripción (membresía que cubra el día del turno, cupo, 8 horas de anticipación, un turno por día, sin duplicados, cancelar y volver a anotarse), qué ve cada rol, registro de asistencia (profesor del turno, estados válidos, turno futuro) y reglas de borrado |
 
 ## Frontend
@@ -52,11 +54,13 @@ Usa [supertest](https://github.com/ladjs/supertest) para llamar a la API real (l
 | `src/components/cliente/ClienteCard.test.tsx` | Muestra el estado de membresía y su vencimiento, "Sin membresía", no muestra membresía en la vista del profesor, aviso de contraseña inicial, botón "Ver detalle" |
 | `src/context/ColorModeProvider.test.tsx` | Tema claro por defecto, aplica y guarda el modo oscuro, recuerda la elección, ignora valores inválidos |
 | `src/utils/turno.test.ts` | Formato de horas y días, lugares libres y turno completo, inscripción vigente, horas que faltan para el inicio, membresía que cubre el día |
+| `src/components/membresia/RenovarMembresiaDialog.test.tsx` | Muestra las fechas calculadas y el último importe, registra el pago, exige el importe la primera vez, rechaza importes inválidos y muestra el error si falla |
 | `src/components/turno/TurnoCard.test.tsx` | Horario, clase, profesor y lugares; turno completo; sin profesor; plantilla "Todos los días"; acciones |
 
 ## Lo que no cubren
 
 - **No hay test end-to-end** (navegador real contra backend y base reales). Las pantallas se verificaron a mano en el navegador. La herramienta natural para sumarlo es [Playwright](https://playwright.dev).
+- La **concurrencia** (dos renovaciones a la vez) no se puede probar con SQLite en memoria, que usa una sola conexión: se verificó a mano contra PostgreSQL.
 - Las **migraciones** no se prueban con SQLite (usan SQL de PostgreSQL): se ejercitan al levantar el servidor contra una base PostgreSQL vacía.
 
 ## Evidencia
@@ -65,10 +69,10 @@ Salida resumida de la última ejecución:
 
 ```text
 Backend
- Test Files  6 passed (6)
-      Tests  94 passed (94)
+ Test Files  8 passed (8)
+      Tests  112 passed (112)
 
 Frontend
- Test Files  6 passed (6)
-      Tests  41 passed (41)
+ Test Files  7 passed (7)
+      Tests  46 passed (46)
 ```

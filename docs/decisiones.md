@@ -74,3 +74,13 @@ Los tests del backend corren con `NODE_ENV=test`, que reemplaza la conexión por
 **Lo que ve cada rol:** el profesor solo ve los turnos que dicta; el cliente solo ve su propia inscripción en cada turno (por eso cada turno trae `inscriptos`, para saber cuántos lugares quedan). La membresía se pide para el **día del turno** y no solo para hoy, así nadie se anota a una clase que cae después de su vencimiento; si necesita reservar más adelante, renueva primero. Esto une las dos partes del sistema: las membresías que carga el admin habilitan las reservas.
 
 **Sin Salón:** los turnos no tienen salón ni actividad aparte (ver la decisión 8): alcanza con el tipo de clase.
+
+## 12. Renovar membresía: las fechas las calcula el sistema
+
+**Decisión:** renovar es un caso de uso propio, además del CRUD de membresías. El admin elige al cliente, ve cómo quedaría (desde, hasta, importe) y confirma el pago; no carga las fechas a mano.
+
+**Por qué:** cargar las fechas a mano es fuente de errores (huecos entre una membresía y la siguiente, superposiciones, fechas mal escritas), y de esas fechas depende que el cliente pueda reservar. Con el cálculo del lado del backend, la regla vale igual para cualquier pantalla.
+
+**Reglas:** empieza al día siguiente del vencimiento si la última sigue al día y, si no, hoy; dura 30 días; repite el último importe. Se bloquea al cliente mientras se calcula, para que dos renovaciones simultáneas no se superpongan (con SQLite en los tests no se puede probar la concurrencia: se verificó contra PostgreSQL).
+
+**Relación con los otros casos de uso:** la membresía que registra este caso de uso es la que habilita `Reservar turno`, y la reserva alimenta el registro de asistencia.

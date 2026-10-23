@@ -116,8 +116,33 @@ Cada pago de un cliente es una membresía. El **estado se calcula** y viene en l
 | GET | `/membresias/:id` | Admin, cliente (solo las suyas) | |
 | GET | `/membresias/cliente/:dni` | Admin | |
 | POST | `/membresias` | Admin | `{ dniCliente, fechaPago, fechaInicio, fechaVencimiento, valor }` |
+| GET | `/membresias/renovacion/:dni` | Admin | Cómo quedaría la renovación del cliente (no crea nada) |
+| POST | `/membresias/renovar/:dni` | Admin | `{ fechaPago?, valor? }` Registra el pago y crea la nueva membresía con las fechas calculadas |
 | PUT | `/membresias/:id` | Admin | Cualquiera de las fechas o `valor` (el cliente no se puede cambiar) |
 | DELETE | `/membresias/:id` | Admin | |
+
+### Renovar una membresía
+
+Caso de uso del admin: el cliente paga y el sistema calcula las fechas. La nueva membresía:
+
+- **Empieza** el día siguiente al vencimiento de la última, si todavía está al día (no se pierden ni se superponen días). Si ya venció, o el cliente no tiene ninguna, empieza **hoy**.
+- **Dura 30 días**.
+- Toma el **importe** de la última (`valor`), o el que se envíe. La primera vez hay que enviarlo (`400` si falta).
+- Toma como **fecha de pago** hoy, o la que se envíe.
+
+`GET /membresias/renovacion/:dni` devuelve la propuesta para mostrarla antes de confirmar:
+
+```json
+{
+  "ultima": { "idMembresia": 7, "fechaVencimiento": "2026-11-02", "estado": "Por vencer" },
+  "fechaPago": "2026-10-23",
+  "fechaInicio": "2026-11-03",
+  "fechaVencimiento": "2026-12-03",
+  "valor": 25000
+}
+```
+
+Si dos renovaciones del mismo cliente llegan a la vez, la segunda espera a la primera (se bloquea al cliente), así que quedan consecutivas y nunca superpuestas. Después de renovar, el cliente puede reservar turnos que caigan dentro del período nuevo.
 
 `valor` va de 0 a 99999999.99; las fechas tienen que existir (`2026-02-30` se rechaza) y `fechaInicio` no puede ser posterior a `fechaVencimiento`.
 

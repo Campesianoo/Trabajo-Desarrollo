@@ -42,6 +42,7 @@
 | Clases, turnos e inscripciones | ✅ | ✅ |
 | Listado "Clases del día" con detalle de inscriptos | ✅ | ✅ |
 | CUU: reservar turno / registrar asistencia | ✅ | ✅ |
+| CUU: renovar membresía | ✅ | ✅ |
 | Tests automáticos | ✅ | ✅ |
 | Documentación | ✅ | ✅ |
 | Deploy con cuentas de demostración | 🚧 | 🚧 |

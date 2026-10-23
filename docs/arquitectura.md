@@ -46,99 +46,139 @@ flowchart TD
 
 ## Modelo de datos
 
+Diagrama entidad-relación **generado desde el esquema real** de PostgreSQL (se aplican todas las migraciones a una base limpia y se lee el resultado), así que tablas, columnas, tipos y claves coinciden con la base. `FK` es clave foránea, `UK` único y, entre paréntesis, la acción `ON DELETE` (sin acción: `NO ACTION`).
+
 ```mermaid
 erDiagram
-    Usuarios ||--o| clientes : "idUsuario"
-    Usuarios ||--o| Profesores : "dniProfesor"
-    Profesores }o--o{ Especialidades : "ProfesorEspecialidad"
+    clientes |o--o{ InscripcionTurno : "dniCliente (CASCADE)"
+    Turnos ||--o{ InscripcionTurno : "idTurno"
     clientes ||--o{ Membresias : "dniCliente (CASCADE)"
-    clientes ||--o{ Rutinas : "dniCliente (CASCADE)"
-    Profesores ||--o{ Rutinas : "dniProfesor (NO ACTION)"
+    Profesores ||--o{ ProfesorEspecialidad : "dniProfesor (CASCADE)"
+    Especialidades ||--o{ ProfesorEspecialidad : "idEspecialidad (CASCADE)"
     Rutinas ||--o{ RutinaEjercicios : "idRutina (CASCADE)"
-    TiposClase ||--o{ Turnos : "idClase (RESTRICT)"
+    clientes ||--o{ Rutinas : "dniCliente (CASCADE)"
+    Profesores ||--o{ Rutinas : "dniProfesor"
+    Profesores |o--o{ TurnoProfesores : "dniProfesor"
     Turnos ||--o{ TurnoProfesores : "idTurno (CASCADE)"
-    Profesores ||--o{ TurnoProfesores : "dniProfesor (RESTRICT)"
-    Turnos ||--o{ InscripcionTurno : "idTurno (RESTRICT)"
-    clientes ||--o{ InscripcionTurno : "dniCliente (CASCADE)"
+    TiposClase ||--o{ Turnos : "idClase"
+    Profesores |o--o| Usuarios : "dniProfesor (RESTRICT)"
+    Usuarios ||--o| clientes : "idUsuario (RESTRICT)"
 
-    Usuarios {
-        int id PK
-        string email UK
-        string passwordHash
-        enum rol "admin, profesor, cliente"
-        bool activo
-        int tokenVersion
-        bool debeCambiarPassword
-        int dniProfesor FK
-    }
-    clientes {
-        int dni PK
-        string nombre
-        string apellido
-        string telefono
-        string email
-        bool estado
-        int idUsuario FK
-    }
-    Profesores {
-        int dni PK
-        string nombre
-        string apellido
-        string telefono
-        string email
-    }
     Especialidades {
-        int id PK
-        string nombre
+        integer id PK
+        varchar_255 nombre
+        timestamptz createdAt
+        timestamptz updatedAt
     }
+
+    InscripcionTurno {
+        bigint idInscripcion PK
+        bigint idTurno FK
+        integer dniCliente FK
+        timestamptz fechaHoraInscripcion
+        text estado
+        timestamptz createdAt
+        timestamptz updatedAt
+    }
+
     Membresias {
         bigint idMembresia PK
-        int dniCliente FK
+        integer dniCliente FK
         date fechaPago
         date fechaInicio
         date fechaVencimiento
-        decimal valor
+        numeric_10_2 valor
+        timestamptz createdAt
+        timestamptz updatedAt
     }
-    Rutinas {
-        int idRutina PK
-        string nombreRutina
-        string diaSemana
-        int dniCliente FK
-        int dniProfesor FK
+
+    ProfesorEspecialidad {
+        integer dniProfesor PK,FK
+        integer idEspecialidad PK,FK
     }
+
+    Profesores {
+        integer dni PK
+        varchar_255 nombre
+        varchar_255 apellido
+        varchar_255 telefono
+        varchar_255 email
+        timestamptz createdAt
+        timestamptz updatedAt
+    }
+
     RutinaEjercicios {
-        int id PK
-        int idRutina FK
-        string nombreEjercicio
-        int series
-        string repeticiones
-        int descanso
+        bigint id PK
+        bigint idRutina FK
+        text nombreEjercicio
+        integer series
+        text repeticiones
+        smallint descanso
+        timestamptz createdAt
+        timestamptz updatedAt
     }
+
+    Rutinas {
+        bigint idRutina PK
+        text nombreRutina
+        text diaSemana
+        integer dniCliente FK
+        integer dniProfesor FK
+        timestamptz createdAt
+        timestamptz updatedAt
+    }
+
     TiposClase {
         bigint idClase PK
         text nombre
         text descripcion
+        timestamptz createdAt
+        timestamptz updatedAt
     }
-    Turnos {
-        bigint idTurno PK
-        bigint idClase FK
-        date fecha "null = plantilla diaria"
-        time horaInicio
-        time horaFin
-        int capacidadMaxima
-        text estado
-    }
+
     TurnoProfesores {
         bigint id PK
         bigint idTurno FK
-        int dniProfesor FK
+        integer dniProfesor FK
+        timestamptz createdAt
+        timestamptz updatedAt
     }
-    InscripcionTurno {
-        bigint idInscripcion PK
-        bigint idTurno FK
-        int dniCliente FK
-        timestamptz fechaHoraInscripcion
-        text estado "activa, cancelada, asistio, ausente"
+
+    Turnos {
+        bigint idTurno PK
+        bigint idClase FK
+        date fecha
+        time horaInicio
+        time horaFin
+        integer capacidadMaxima
+        text estado
+        timestamptz createdAt
+        timestamptz updatedAt
+    }
+
+    Usuarios {
+        integer id PK
+        varchar_255 email UK
+        varchar_255 passwordHash
+        enum rol
+        boolean activo
+        integer tokenVersion
+        boolean debeCambiarPassword
+        integer dniProfesor FK,UK
+        timestamptz createdAt
+        timestamptz updatedAt
+    }
+
+    clientes {
+        integer dni PK
+        varchar_100 nombre
+        varchar_100 apellido
+        varchar_30 telefono
+        varchar_100 email
+        boolean estado
+        integer idUsuario FK,UK
+        timestamptz createdAt
+        timestamptz updatedAt
     }
 ```
 

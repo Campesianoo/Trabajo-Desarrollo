@@ -1,7 +1,14 @@
 const Membresia = require('../models/membresia');
 const Cliente = require('../models/Cliente');
+const sequelize = require('../config/database');
 const { sendError, toPositiveInt } = require('../utils/http');
-const { fechaValida, valorValido, calcularEstado } = require('../utils/membresia');
+const {
+  hoy,
+  fechaValida,
+  valorValido,
+  calcularEstado,
+  proponerRenovacion
+} = require('../utils/membresia');
 
 const incluirCliente = {
   model: Cliente,
@@ -185,11 +192,107 @@ const deleteMembresia = async (req, res) => {
   }
 };
 
+// La membresía que vence más tarde de un cliente (la que se renueva), o null
+const ultimaMembresia = (dniCliente, transaction) =>
+  Membresia.findOne({
+    where: { dniCliente },
+    order: [
+      ['fechaVencimiento', 'DESC'],
+      ['idMembresia', 'DESC']
+    ],
+    transaction
+  });
+
+// GET /api/membresias/renovacion/:dni - cómo quedaría la renovación de un cliente (solo admin)
+const getRenovacion = async (req, res) => {
+  try {
+    const dniCliente = toPositiveInt(req.params.dni);
+    if (!dniCliente) return res.status(400).json({ message: 'dni inválido' });
+    if (!(await Cliente.findByPk(dniCliente))) {
+      return res.status(404).json({ message: 'El cliente especificado no existe' });
+    }
+
+    const ultima = await ultimaMembresia(dniCliente);
+    res.json({
+      ultima: ultima ? aRespuesta(ultima) : null,
+      fechaPago: hoy(),
+      ...proponerRenovacion(ultima),
+      // Se propone el mismo importe que la última vez; la primera vez lo carga el admin
+      valor: ultima ? Number(ultima.valor) : null
+    });
+  } catch (error) {
+    sendError(res, 500, 'Error al calcular la renovación', error);
+  }
+};
+
+// POST /api/membresias/renovar/:dni { fechaPago?, valor? } - registra el pago de un cliente y
+// crea su nueva membresía con las fechas calculadas (solo admin)
+const renovarMembresia = async (req, res) => {
+  try {
+    const dniCliente = toPositiveInt(req.params.dni);
+    if (!dniCliente) return res.status(400).json({ message: 'dni inválido' });
+
+    let fechaPago = hoy();
+    if (req.body.fechaPago !== undefined) {
+      fechaPago = fechaValida(req.body.fechaPago);
+      if (!fechaPago) {
+        return res
+          .status(400)
+          .json({ message: 'fechaPago tiene que ser una fecha válida (AAAA-MM-DD)' });
+      }
+    }
+
+    // Se bloquea al cliente para que dos renovaciones a la vez no calculen sobre la misma última
+    // membresía y queden superpuestas
+    const nueva = await sequelize.transaction(async (transaction) => {
+      const cliente = await Cliente.findByPk(dniCliente, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      if (!cliente) return { status: 404, message: 'El cliente especificado no existe' };
+
+      const ultima = await ultimaMembresia(dniCliente, transaction);
+      const valor =
+        req.body.valor !== undefined
+          ? valorValido(req.body.valor)
+          : ultima
+            ? Number(ultima.valor)
+            : null;
+      if (valor === null) {
+        return {
+          status: 400,
+          message:
+            req.body.valor !== undefined
+              ? 'valor tiene que ser un número entre 0 y 99999999.99'
+              : 'valor es obligatorio: el cliente todavía no tiene ninguna membresía'
+        };
+      }
+
+      const creada = await Membresia.create(
+        { dniCliente, fechaPago, valor, ...proponerRenovacion(ultima) },
+        { transaction }
+      );
+      return { creada };
+    });
+
+    if (!nueva.creada) return res.status(nueva.status).json({ message: nueva.message });
+    res
+      .status(201)
+      .json(
+        aRespuesta(await Membresia.findByPk(nueva.creada.idMembresia, { include: incluirCliente }))
+      );
+  } catch (error) {
+    sendError(res, 500, 'Error al renovar la membresía', error);
+  }
+};
+
 module.exports = {
   getMembresias,
   getMembresiaById,
   getMembresiasByCliente,
   createMembresia,
   updateMembresia,
-  deleteMembresia
+  deleteMembresia,
+  getRenovacion,
+  renovarMembresia
 };
