@@ -43,7 +43,7 @@
 | Listado "Clases del día" con detalle de inscriptos | ✅ | ✅ |
 | CUU: reservar turno / registrar asistencia | ✅ | ✅ |
 | CUU: renovar membresía | ✅ | ✅ |
-| Tests automáticos | ✅ | ✅ |
+| Tests automáticos (unitarios, de integración y end-to-end) | ✅ | ✅ |
 | Documentación | ✅ | ✅ |
 | Deploy con cuentas de demostración | 🚧 | 🚧 |
 | Video de demostración | ⏳ | |
@@ -66,5 +66,4 @@
 ## Pendientes conocidos
 
 - Actualizar la propuesta (`proposal.md`): quitar Salón y la sección de adicionales heredada de otra plantilla.
-- Test end-to-end con Playwright.
 - Revisar las vulnerabilidades que reporta `npm audit` en el frontend.

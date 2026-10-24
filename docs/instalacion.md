@@ -70,6 +70,7 @@ La app queda en `http://localhost:5173`. No llama al backend directo: pide todo 
 | backend | `pnpm run migrate` / `migrate:status` / `migrate:down` | Gestión de migraciones |
 | backend | `pnpm run format` / `format:check` | Prettier |
 | frontend | `npm test` | Corre los tests (vitest + Testing Library) |
+| frontend | `npm run test:e2e` | Tests end-to-end con Playwright (ver [tests](tests.md#test-end-to-end-frontend)) |
 | frontend | `npm run lint` | ESLint |
 | frontend | `npm run build` | Chequeo de tipos + build de producción |
 
