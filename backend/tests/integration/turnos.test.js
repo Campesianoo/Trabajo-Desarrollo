@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { ADMIN, iniciarBase, loguear, conOrigen } = require('../helpers');
 const { hoy } = require('../../src/utils/membresia');
-const { InscripcionTurno } = require('../../src/models/associations');
+const { InscripcionTurno, Turno } = require('../../src/models/associations');
 
 // Fecha de hoy +/- días, en AAAA-MM-DD (hora de Argentina, como el backend)
 const enDias = (dias) =>
@@ -147,6 +147,80 @@ describe('plantillas', () => {
   it('pedir los turnos de nuevo no duplica los generados', async () => {
     const res = await admin.get(`/api/turnos?desde=${enDias(0)}&hasta=${enDias(29)}`);
     expect(res.body.filter((t) => t.horaInicio === '07:00:00')).toHaveLength(30);
+  });
+
+  it('editar una plantilla actualiza sus turnos generados sin tocar los de un solo día', async () => {
+    const plantilla = await nuevoTurno({
+      fecha: null,
+      horaInicio: '12:00',
+      horaFin: '13:00',
+      capacidadMaxima: 5
+    });
+    expect(plantilla.status).toBe(201);
+    await admin.get(`/api/turnos?desde=${enDias(0)}&hasta=${enDias(29)}`);
+    await Turno.update(
+      { idTurnoPlantilla: null },
+      { where: { idTurnoPlantilla: plantilla.body.idTurno } }
+    );
+
+    const puntual = await nuevoTurno({
+      fecha: enDias(10),
+      horaInicio: '16:00',
+      horaFin: '17:00',
+      capacidadMaxima: 5
+    });
+    expect(puntual.status).toBe(201);
+
+    const actualizacion = await conOrigen(admin.put(`/api/turnos/${plantilla.body.idTurno}`)).send({
+      capacidadMaxima: 8
+    });
+    expect(actualizacion.status).toBe(200);
+
+    const turnos = await admin.get(`/api/turnos?desde=${enDias(0)}&hasta=${enDias(29)}`);
+    const generados = turnos.body.filter(
+      (turno) => turno.idTurnoPlantilla === plantilla.body.idTurno
+    );
+    expect(generados).toHaveLength(30);
+    expect(generados.every((turno) => turno.capacidadMaxima === 8)).toBe(true);
+
+    const puntualActualizado = await admin.get(`/api/turnos/${puntual.body.idTurno}`);
+    expect(puntualActualizado.body.capacidadMaxima).toBe(5);
+
+    const edicionPuntual = await conOrigen(admin.put(`/api/turnos/${puntual.body.idTurno}`)).send({
+      capacidadMaxima: 6
+    });
+    expect(edicionPuntual.status).toBe(200);
+    expect(edicionPuntual.body.capacidadMaxima).toBe(6);
+
+    const plantillaActualizada = await admin.get(`/api/turnos/${plantilla.body.idTurno}`);
+    expect(plantillaActualizada.body.capacidadMaxima).toBe(8);
+  });
+
+  it('editar una ocurrencia diaria también actualiza toda su serie', async () => {
+    const plantilla = await nuevoTurno({
+      fecha: null,
+      horaInicio: '14:00',
+      horaFin: '15:00',
+      capacidadMaxima: 5
+    });
+    expect(plantilla.status).toBe(201);
+    const turnos = await admin.get(`/api/turnos?desde=${enDias(0)}&hasta=${enDias(29)}`);
+    const ocurrencia = turnos.body.find(
+      (turno) => turno.idTurnoPlantilla === plantilla.body.idTurno
+    );
+    expect(ocurrencia).toBeTruthy();
+
+    const actualizacion = await conOrigen(admin.put(`/api/turnos/${ocurrencia.idTurno}`)).send({
+      capacidadMaxima: 9
+    });
+    expect(actualizacion.status).toBe(200);
+
+    const actualizados = await admin.get(`/api/turnos?desde=${enDias(0)}&hasta=${enDias(29)}`);
+    const generados = actualizados.body.filter(
+      (turno) => turno.idTurnoPlantilla === plantilla.body.idTurno
+    );
+    expect(generados).toHaveLength(30);
+    expect(generados.every((turno) => turno.capacidadMaxima === 9)).toBe(true);
   });
 });
 

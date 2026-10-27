@@ -211,13 +211,18 @@ const generarTurnosDiarios = async () => {
 
       const existentes = await Turno.findAll({
         where: {
-          idClase: plantilla.idClase,
           fecha: { [Op.between]: [fechaInicio, fechaFin] },
-          horaInicio,
-          horaFin,
-          capacidadMaxima: capacidad
+          [Op.or]: [
+            {
+              idClase: plantilla.idClase,
+              horaInicio,
+              horaFin,
+              capacidadMaxima: capacidad
+            },
+            { idTurnoPlantilla: plantilla.idTurno }
+          ]
         },
-        attributes: ['fecha'],
+        attributes: ['idTurno', 'fecha', 'idTurnoPlantilla'],
         transaction
       });
       const fechasExistentes = new Set(existentes.map(({ fecha }) => fecha));
@@ -235,6 +240,7 @@ const generarTurnosDiarios = async () => {
           horaInicio,
           horaFin,
           capacidadMaxima: capacidad,
+          idTurnoPlantilla: plantilla.idTurno,
           estado: plantilla.estado
         })),
         { transaction, returning: true }
@@ -316,6 +322,60 @@ const parseDniProfesores = async (dniProfesores) => {
     return { error: 'Uno o más profesores no existen' };
   }
   return { values };
+};
+
+const vincularTurnosGeneradosExistentes = async (plantilla, transaction) => {
+  const fechaInicio = fechaBuenosAires();
+  const fechaFin = sumarDias(fechaInicio, DIAS_GENERACION - 1);
+  const candidatos = await Turno.findAll({
+    where: {
+      idTurnoPlantilla: null,
+      idClase: plantilla.idClase,
+      fecha: { [Op.between]: [fechaInicio, fechaFin] },
+      horaInicio: plantilla.horaInicio,
+      horaFin: plantilla.horaFin,
+      capacidadMaxima: plantilla.capacidadMaxima
+    },
+    attributes: ['idTurno'],
+    transaction,
+    lock: transaction.LOCK.UPDATE
+  });
+  if (!candidatos.length) return;
+
+  const idsTurnos = [plantilla.idTurno, ...candidatos.map(({ idTurno }) => idTurno)];
+  const asignaciones = await TurnoProfesor.findAll({
+    where: { idTurno: { [Op.in]: idsTurnos } },
+    attributes: ['idTurno', 'dniProfesor'],
+    transaction
+  });
+  const profesoresPorTurno = new Map(idsTurnos.map((id) => [Number(id), []]));
+  for (const asignacion of asignaciones) {
+    profesoresPorTurno.get(Number(asignacion.idTurno))?.push(Number(asignacion.dniProfesor));
+  }
+  const profesoresPlantilla = (profesoresPorTurno.get(Number(plantilla.idTurno)) ?? []).sort(
+    (a, b) => a - b
+  );
+  const idsVinculados = candidatos
+    .filter((turno) => {
+      const profesoresTurno = (profesoresPorTurno.get(Number(turno.idTurno)) ?? []).sort(
+        (a, b) => a - b
+      );
+      return (
+        profesoresTurno.length === profesoresPlantilla.length &&
+        profesoresTurno.every((dni, index) => dni === profesoresPlantilla[index])
+      );
+    })
+    .map(({ idTurno }) => idTurno);
+
+  if (idsVinculados.length) {
+    await Turno.update(
+      { idTurnoPlantilla: plantilla.idTurno },
+      {
+        where: { idTurno: { [Op.in]: idsVinculados }, idTurnoPlantilla: null },
+        transaction
+      }
+    );
+  }
 };
 
 const getTurnos = async (req, res) => {
@@ -439,44 +499,95 @@ const updateTurno = async (req, res) => {
     const turno = await Turno.findByPk(idTurno);
     if (!turno) return res.status(404).json({ message: 'Turno no encontrado' });
 
+    const idTurnoPlantilla = turno.fecha === null ? idTurno : toPositiveInt(turno.idTurnoPlantilla);
+    const esRecurrente = idTurnoPlantilla !== null;
+    const plantilla = esRecurrente ? await Turno.findByPk(idTurnoPlantilla) : turno;
+    if (!plantilla) return res.status(409).json({ message: 'La plantilla del turno no existe' });
+
     const parsed = parseTurnoValues(req.body, true);
     if (parsed.error) return res.status(400).json({ message: parsed.error });
     const profesoresParsed = await parseDniProfesores(req.body.dniProfesores);
     if (profesoresParsed.error) {
       return res.status(400).json({ message: profesoresParsed.error });
     }
-    const idClase = parsed.values.idClase ?? turno.idClase;
+    const idClase = parsed.values.idClase ?? plantilla.idClase;
     if (parsed.values.idClase !== undefined && !(await TipoClase.findByPk(idClase))) {
       return res.status(400).json({ message: 'Tipo de clase no encontrado' });
     }
-    const horaInicio = parsed.values.horaInicio ?? String(turno.horaInicio);
-    const horaFin = parsed.values.horaFin ?? String(turno.horaFin);
+    const horaInicio = parsed.values.horaInicio ?? String(plantilla.horaInicio);
+    const horaFin = parsed.values.horaFin ?? String(plantilla.horaFin);
     if (horaFin <= horaInicio) {
       return res.status(400).json({ message: 'horaFin debe ser posterior a horaInicio' });
     }
-    const capacidad = parsed.values.capacidadMaxima ?? turno.capacidadMaxima;
-    const inscripcionesActivas = await InscripcionTurno.count({
-      where: { idTurno, ...estadoVigente }
-    });
-    if (capacidad !== null && capacidad < inscripcionesActivas) {
-      return res.status(409).json({
-        message: 'La capacidad máxima no puede ser menor que las inscripciones vigentes'
-      });
-    }
-
+    const capacidad = parsed.values.capacidadMaxima ?? plantilla.capacidadMaxima;
+    let capacidadInvalida = false;
     await sequelize.transaction(async (transaction) => {
-      await turno.update(parsed.values, { transaction });
+      let idsActualizados = [idTurno];
+      let valoresActualizados = parsed.values;
+
+      if (esRecurrente) {
+        await vincularTurnosGeneradosExistentes(plantilla, transaction);
+        const generados = await Turno.findAll({
+          where: { idTurnoPlantilla },
+          attributes: ['idTurno'],
+          transaction,
+          lock: transaction.LOCK.UPDATE
+        });
+        idsActualizados = [idTurnoPlantilla, ...generados.map(({ idTurno: id }) => Number(id))];
+        valoresActualizados = { ...parsed.values };
+        delete valoresActualizados.fecha;
+      }
+
+      if (capacidad !== null) {
+        const inscriptosPorTurno = await InscripcionTurno.findAll({
+          attributes: ['idTurno', [fn('COUNT', col('idInscripcion')), 'total']],
+          where: { idTurno: { [Op.in]: idsActualizados }, ...estadoVigente },
+          group: ['idTurno'],
+          raw: true,
+          transaction
+        });
+        if (inscriptosPorTurno.some(({ total }) => Number(total) > capacidad)) {
+          capacidadInvalida = true;
+          return;
+        }
+      }
+
+      if (esRecurrente) {
+        await Turno.update(valoresActualizados, {
+          where: { idTurno: idTurnoPlantilla },
+          transaction
+        });
+        if (idsActualizados.length > 1) {
+          await Turno.update(valoresActualizados, {
+            where: { idTurnoPlantilla },
+            transaction
+          });
+        }
+      } else {
+        await turno.update(valoresActualizados, { transaction });
+      }
+
       if (profesoresParsed.values !== null) {
-        await TurnoProfesor.destroy({ where: { idTurno }, transaction });
+        await TurnoProfesor.destroy({
+          where: { idTurno: { [Op.in]: idsActualizados } },
+          transaction
+        });
         if (profesoresParsed.values.length) {
           await TurnoProfesor.bulkCreate(
-            profesoresParsed.values.map((dniProfesor) => ({ idTurno, dniProfesor })),
+            idsActualizados.flatMap((id) =>
+              profesoresParsed.values.map((dniProfesor) => ({ idTurno: id, dniProfesor }))
+            ),
             { transaction }
           );
         }
       }
     });
-    if (turno.fecha === null) marcarPlantillasModificadas();
+    if (capacidadInvalida) {
+      return res.status(409).json({
+        message: 'La capacidad máxima no puede ser menor que las inscripciones vigentes'
+      });
+    }
+    if (esRecurrente) marcarPlantillasModificadas();
     const completo = await Turno.findByPk(idTurno, {
       include: includeTurno({ user: { rol: 'admin' } })
     });

@@ -39,6 +39,16 @@ const Turno = sequelize.define(
       allowNull: true,
       field: 'capacidadMaxima'
     },
+    idTurnoPlantilla: {
+      type: DataTypes.BIGINT,
+      allowNull: true,
+      references: {
+        model: 'Turnos',
+        key: 'idTurno'
+      },
+      onDelete: 'SET NULL',
+      field: 'idTurnoPlantilla'
+    },
     estado: {
       type: DataTypes.TEXT,
       allowNull: true,
