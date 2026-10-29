@@ -44,35 +44,30 @@ Para una base local alcanza con un PostgreSQL instalado y estas variables en el 
 
 **Regla:** toda rama que agregue o cambie tablas **tiene que traer su propia migración**. Sin ella, quien levante el proyecto desde cero no tiene esas tablas, y el que usó la base compartida ve cosas que nadie más puede reproducir.
 
-Caso concreto: las tablas de clases (`TiposClase`, `Turnos`, `TurnoProfesores`, `InscripcionTUrno`) **ya existen en Supabase** porque se crearon al correr esa rama contra la base compartida, pero no tienen migración. Por eso su migración tiene que ser **idempotente**: usar `IF NOT EXISTS`, así corre sin error tanto donde las tablas ya existen (Supabase) como en una base vacía (cualquier otro).
+Caso concreto: las tablas de clases (`TiposClase`, `Turnos`, `TurnoProfesores`, `InscripcionTUrno`) **ya existían en Supabase** porque se crearon al correr esa rama contra la base compartida, sin migración, y con dos typos: la tabla `InscripcionTUrno` y las columnas `createdAT`/`updatedAT` de `Turnos`. Su migración, [`20261022-01-clases-y-turnos.js`](../backend/migrations/20261022-01-clases-y-turnos.js), es el ejemplo a seguir. Es **idempotente**, así que corre sin error en las dos situaciones:
 
-Ejemplo de la forma que debería tener:
+- **Donde las tablas ya existen (Supabase):** renombra los typos (`InscripcionTUrno` → `InscripcionTurno`, `createdAT` → `createdAt`), agrega la cascada al borrar un cliente y crea los índices.
+- **En una base vacía:** crea las cuatro tablas desde cero.
+
+Las dos situaciones se probaron con un PostgreSQL temporal, incluidas una segunda corrida (no hace nada) y `down` seguido de `up`.
+
+Cómo se logra, en resumen:
 
 ```js
-// 20261020-01-clases-y-turnos.js
-module.exports = {
-  up: async ({ context: queryInterface }) => {
-    await queryInterface.sequelize.query(`
-      CREATE TABLE IF NOT EXISTS "TiposClase" (
-        "idClase"     SERIAL PRIMARY KEY,
-        "nombre"      VARCHAR(100) NOT NULL,
-        "descripcion" TEXT
-      );
-      CREATE TABLE IF NOT EXISTS "Turnos" (
-        "idTurno"         SERIAL PRIMARY KEY,
-        "idClase"         INTEGER NOT NULL REFERENCES "TiposClase"("idClase"),
-        "fecha"           DATE NOT NULL,
-        "horaInicio"      TIME NOT NULL,
-        "horaFin"         TIME NOT NULL,
-        "capacidadMaxima" INTEGER NOT NULL,
-        "estado"          VARCHAR(30) NOT NULL
-      );
-    `);
-  },
-  down: async ({ context: queryInterface }) => {
-    await queryInterface.sequelize.query(`DROP TABLE IF EXISTS "Turnos", "TiposClase" CASCADE`);
-  }
-};
+// Renombra solo si hace falta
+await run(`
+  DO $$
+  BEGIN
+    IF to_regclass('public."InscripcionTUrno"') IS NOT NULL
+       AND to_regclass('public."InscripcionTurno"') IS NULL THEN
+      ALTER TABLE "InscripcionTUrno" RENAME TO "InscripcionTurno";
+    END IF;
+  END $$;
+`);
+
+// Crea solo lo que falta
+await run(`CREATE TABLE IF NOT EXISTS "TiposClase" ( ... )`);
+await run(`CREATE UNIQUE INDEX IF NOT EXISTS "TurnoProfesores_turno_profesor_uq" ON ... `);
 ```
 
-> El SQL exacto tiene que coincidir con los modelos de esa rama (nombres de columnas, tipos, claves foráneas). El ejemplo muestra la forma, no el contenido definitivo.
+> Si una rama nueva se desarrolla contra la base compartida antes de tener su migración, hay que hacer esto mismo: una migración que acepte que las tablas ya existan.

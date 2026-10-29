@@ -1,6 +1,6 @@
 # Documentación – Power Trainer
 
-Sistema web para administrar el flujo de personas del gimnasio **Power Trainer**: clientes, profesores, membresías, rutinas y (próximamente) clases y turnos.
+Sistema web para administrar el flujo de personas del gimnasio **Power Trainer**: clientes, profesores, membresías, rutinas, clases y turnos.
 
 El proyecto son **dos repositorios** independientes que se comunican por una API REST:
 
@@ -31,7 +31,8 @@ El proyecto son **dos repositorios** independientes que se comunican por una API
 | CRUD Cliente, Profesor, Especialidad | Hecho |
 | CRUD dependiente: Membresía (de Cliente), Rutina (de Cliente y Profesor) | Hecho |
 | Listado de clientes con estado de membresía + detalle con su rutina | Hecho |
-| Clases (tipos de clase, turnos, inscripciones) y "Clases del día" | En desarrollo (rama de Mati) |
-| CUU: reservar turno / registrar asistencia | Pendiente (depende de turnos) |
+| Clases (tipos de clase, turnos, inscripciones) y "Clases del día" con detalle de inscriptos | Hecho (PR #9) |
+| CUU: reservar turno para una actividad / registrar asistencia | Hecho (PR #9) |
+| CUU: renovar membresía (el sistema calcula las fechas y el admin registra el pago) | Hecho |
 
 El grupo pasó de 4 a 3 integrantes, por eso se quitó la entidad **Salón** del alcance (ver [decisiones](decisiones.md#8-se-quita-salón-del-alcance)).

@@ -62,3 +62,25 @@ Al borrar un cliente se borran también sus membresías, sus rutinas y su cuenta
 ## 10. Los tests de integración usan SQLite en memoria
 
 Los tests del backend corren con `NODE_ENV=test`, que reemplaza la conexión por una base SQLite en memoria. Así no necesitan un PostgreSQL instalado, son rápidos y, aunque el `.env` tenga `DATABASE_URL`, **nunca tocan la base real**. El esquema de los tests sale de los modelos (`sequelize.sync`), no de las migraciones: las migraciones usan SQL específico de PostgreSQL y se prueban al levantar el servidor contra Postgres.
+
+## 11. Clases y turnos: plantillas, reglas de reserva y asistencia
+
+**Plantillas diarias:** un turno sin fecha es una plantilla que genera los turnos de los próximos 30 días, así el admin no carga uno por uno una clase que se repite todos los días. La generación se hace una vez por día (o al cambiar una plantilla) y es idempotente: pedir los turnos varias veces no duplica nada. Una plantilla mal cargada se omite en lugar de romper el listado de turnos para todos.
+
+**Reglas de reserva:** se reserva con una membresía que cubra el día del turno, con al menos 8 horas de anticipación, un turno por día y hasta la capacidad máxima. Las valida el backend dentro de una transacción con el turno bloqueado, para que dos clientes a la vez no se pasen del cupo; el frontend avisa antes para no frustrar al usuario, pero no es lo que las hace cumplir. Todas devuelven `409` con el motivo.
+
+**Asistencia:** se registra sobre la inscripción (`asistio` o `ausente`) sin agregar tablas: el estado de la inscripción ya existía. Se puede registrar el día del turno o después, y se puede deshacer. Los estados `asistio` y `ausente` siguen contando para el cupo.
+
+**Lo que ve cada rol:** el profesor solo ve los turnos que dicta; el cliente solo ve su propia inscripción en cada turno (por eso cada turno trae `inscriptos`, para saber cuántos lugares quedan). La membresía se pide para el **día del turno** y no solo para hoy, así nadie se anota a una clase que cae después de su vencimiento; si necesita reservar más adelante, renueva primero. Esto une las dos partes del sistema: las membresías que carga el admin habilitan las reservas.
+
+**Sin Salón:** los turnos no tienen salón ni actividad aparte (ver la decisión 8): alcanza con el tipo de clase.
+
+## 12. Renovar membresía: las fechas las calcula el sistema
+
+**Decisión:** renovar es un caso de uso propio, además del CRUD de membresías. El admin elige al cliente, ve cómo quedaría (desde, hasta, importe) y confirma el pago; no carga las fechas a mano.
+
+**Por qué:** cargar las fechas a mano es fuente de errores (huecos entre una membresía y la siguiente, superposiciones, fechas mal escritas), y de esas fechas depende que el cliente pueda reservar. Con el cálculo del lado del backend, la regla vale igual para cualquier pantalla.
+
+**Reglas:** empieza al día siguiente del vencimiento si la última sigue al día y, si no, hoy; dura 30 días; repite el último importe. Se bloquea al cliente mientras se calcula, para que dos renovaciones simultáneas no se superpongan (con SQLite en los tests no se puede probar la concurrencia: se verificó contra PostgreSQL).
+
+**Relación con los otros casos de uso:** la membresía que registra este caso de uso es la que habilita `Reservar turno`, y la reserva alimenta el registro de asistencia.

@@ -5,7 +5,9 @@ const {
   getMembresiasByCliente,
   createMembresia,
   updateMembresia,
-  deleteMembresia
+  deleteMembresia,
+  getRenovacion,
+  renovarMembresia
 } = require('../controllers/membresiaController');
 const { authenticate, authorize } = require('../middlewares/auth');
 
@@ -19,9 +21,11 @@ const adminOCliente = authorize('admin', 'cliente');
 
 router.get('/', adminOCliente, getMembresias);
 router.get('/cliente/:dni', soloAdmin, getMembresiasByCliente);
+router.get('/renovacion/:dni', soloAdmin, getRenovacion);
 router.get('/:id', adminOCliente, getMembresiaById);
 
 router.post('/', soloAdmin, createMembresia);
+router.post('/renovar/:dni', soloAdmin, renovarMembresia);
 router.put('/:id', soloAdmin, updateMembresia);
 router.delete('/:id', soloAdmin, deleteMembresia);
 

@@ -116,8 +116,33 @@ Cada pago de un cliente es una membresía. El **estado se calcula** y viene en l
 | GET | `/membresias/:id` | Admin, cliente (solo las suyas) | |
 | GET | `/membresias/cliente/:dni` | Admin | |
 | POST | `/membresias` | Admin | `{ dniCliente, fechaPago, fechaInicio, fechaVencimiento, valor }` |
+| GET | `/membresias/renovacion/:dni` | Admin | Cómo quedaría la renovación del cliente (no crea nada) |
+| POST | `/membresias/renovar/:dni` | Admin | `{ fechaPago?, valor? }` Registra el pago y crea la nueva membresía con las fechas calculadas |
 | PUT | `/membresias/:id` | Admin | Cualquiera de las fechas o `valor` (el cliente no se puede cambiar) |
 | DELETE | `/membresias/:id` | Admin | |
+
+### Renovar una membresía
+
+Caso de uso del admin: el cliente paga y el sistema calcula las fechas. La nueva membresía:
+
+- **Empieza** el día siguiente al vencimiento de la última, si todavía está al día (no se pierden ni se superponen días). Si ya venció, o el cliente no tiene ninguna, empieza **hoy**.
+- **Dura 30 días**.
+- Toma el **importe** de la última (`valor`), o el que se envíe. La primera vez hay que enviarlo (`400` si falta).
+- Toma como **fecha de pago** hoy, o la que se envíe.
+
+`GET /membresias/renovacion/:dni` devuelve la propuesta para mostrarla antes de confirmar:
+
+```json
+{
+  "ultima": { "idMembresia": 7, "fechaVencimiento": "2026-11-02", "estado": "Por vencer" },
+  "fechaPago": "2026-10-23",
+  "fechaInicio": "2026-11-03",
+  "fechaVencimiento": "2026-12-03",
+  "valor": 25000
+}
+```
+
+Si dos renovaciones del mismo cliente llegan a la vez, la segunda espera a la primera (se bloquea al cliente), así que quedan consecutivas y nunca superpuestas. Después de renovar, el cliente puede reservar turnos que caigan dentro del período nuevo.
 
 `valor` va de 0 a 99999999.99; las fechas tienen que existir (`2026-02-30` se rechaza) y `fechaInicio` no puede ser posterior a `fechaVencimiento`.
 
@@ -137,4 +162,47 @@ El cliente y el profesor de una rutina tienen que existir; si no, `400`.
 
 ## Clases y turnos
 
-Pendiente: se documenta cuando se integre la rama que los implementa (ver [seguimiento](seguimiento.md)).
+Un **tipo de clase** (Crossfit, Musculación…) tiene **turnos**: una fecha, un horario, una capacidad y uno o más profesores. Los clientes se **inscriben** a un turno. Todo vive bajo `/api/turnos`.
+
+### Tipos de clase
+
+| Método | Ruta | Acceso | Body |
+|:-|:-|:-|:-|
+| GET | `/turnos/tipos-clase`, `/turnos/tipos-clase/:id` | Autenticado | |
+| POST | `/turnos/tipos-clase` | Admin | `{ nombre, descripcion? }` |
+| PUT | `/turnos/tipos-clase/:id` | Admin | `{ nombre?, descripcion? }` |
+| DELETE | `/turnos/tipos-clase/:id` | Admin | `409` si tiene turnos |
+
+### Turnos
+
+| Método | Ruta | Acceso | Body / qué hace |
+|:-|:-|:-|:-|
+| GET | `/turnos` | Autenticado | Filtros: `fecha`, o `desde` y `hasta` (AAAA-MM-DD). Sin filtro: los próximos 30 días (admin: todos) |
+| GET | `/turnos/:id` | Autenticado | Un turno |
+| GET | `/turnos/plantillas` | Admin | Turnos que se repiten todos los días |
+| POST | `/turnos` | Admin | `{ idClase, fecha, horaInicio, horaFin, capacidadMaxima, dniProfesores? }` |
+| PUT | `/turnos/:id` | Admin | Cualquiera de esos campos |
+| DELETE | `/turnos/:id` | Admin | `409` si tiene inscripciones |
+
+- **Plantillas:** un turno con `fecha: null` es una plantilla. El backend genera a partir de ella los turnos de los próximos 30 días (una vez por día, y cuando se crea o cambia una plantilla). Los turnos ya generados no se tocan si después se edita o borra la plantilla.
+- **Qué ve cada rol:** el profesor solo recibe los turnos donde está asignado. El cliente recibe en cada turno **solo su propia inscripción**, y no ve las plantillas.
+- **`inscriptos`:** cada turno trae cuántas inscripciones vigentes tiene (las canceladas no cuentan; asistió y ausente sí). Con `capacidadMaxima` se calculan los lugares libres.
+- Horas como `HH:mm` o `HH:mm:ss`; `horaFin` tiene que ser posterior a `horaInicio`. No se puede bajar la capacidad por debajo de las inscripciones vigentes.
+
+### Inscripciones
+
+| Método | Ruta | Acceso | Qué hace |
+|:-|:-|:-|:-|
+| POST | `/turnos/:id/inscripciones` | Cliente | Se inscribe al turno |
+| DELETE | `/turnos/:id/inscripciones` | Cliente | Cancela su inscripción vigente |
+| GET | `/turnos/:id/inscripciones` | Admin, profesor del turno | Clientes anotados (incluye las canceladas) |
+| PUT | `/turnos/:id/inscripciones/:dniCliente` | Admin, profesor del turno | `{ estado }`: `asistio`, `ausente` o `activa` (deshacer) |
+
+Reglas de la inscripción (todas responden `409` con el motivo):
+- Hace falta una **membresía que cubra el día del turno** (`fechaInicio` ≤ día del turno ≤ `fechaVencimiento`). Si no tiene ninguna al día: "Necesitás una membresía vigente para reservar"; si la tiene pero vence antes del turno: "Tu membresía no cubre el día de este turno".
+- Hay que anotarse con al menos **8 horas de anticipación**.
+- **Un turno por día** por cliente.
+- No se puede superar la **capacidad máxima** (se controla con el turno bloqueado: dos clientes a la vez no pueden pasarse del cupo).
+- No se puede estar inscripto dos veces al mismo turno. Si canceló, puede volver a anotarse.
+
+La asistencia solo se registra el día del turno o después (`409` si es un turno futuro). Los estados de una inscripción son `activa`, `cancelada`, `asistio` y `ausente`.

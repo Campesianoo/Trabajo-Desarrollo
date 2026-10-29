@@ -6,6 +6,10 @@ const Rutina = require('./rutina');
 const RutinaEjercicio = require('./rutinaEjercicio');
 const Cliente = require('./Cliente');
 const Membresia = require('./membresia');
+const TipoClase = require('./tipoClase');
+const Turno = require('./turno');
+const TurnoProfesor = require('./turnoProfesor');
+const InscripcionTurno = require('./inscripcionTurno');
 
 // Profesor <-> Especialidad (Muchos a Muchos)
 Profesor.belongsToMany(Especialidad, {
@@ -19,7 +23,8 @@ Especialidad.belongsToMany(Profesor, {
   through: ProfesorEspecialidad,
   foreignKey: 'idEspecialidad',
   otherKey: 'dniProfesor',
-  as: 'profesores'
+  as: 'profesores',
+  onDelete: 'RESTRICT'
 });
 
 // RESTRICT: no se puede borrar un profesor que tiene cuenta de usuario
@@ -51,6 +56,51 @@ Rutina.hasMany(RutinaEjercicio, {
 });
 RutinaEjercicio.belongsTo(Rutina, { foreignKey: 'idRutina', as: 'rutina' });
 
+// Tipos de clase <-> turnos
+// RESTRICT: no se puede borrar un tipo de clase que tiene turnos
+TipoClase.hasMany(Turno, { foreignKey: 'idClase', as: 'turnos', onDelete: 'RESTRICT' });
+Turno.belongsTo(TipoClase, { foreignKey: 'idClase', as: 'tipoClase', onDelete: 'RESTRICT' });
+
+// Turnos <-> profesores asignados (un profesor con turnos asignados no se puede borrar)
+Turno.belongsToMany(Profesor, {
+  through: TurnoProfesor,
+  foreignKey: 'idTurno',
+  otherKey: 'dniProfesor',
+  as: 'profesores'
+});
+Profesor.belongsToMany(Turno, {
+  through: TurnoProfesor,
+  foreignKey: 'dniProfesor',
+  otherKey: 'idTurno',
+  as: 'turnos',
+  onDelete: 'RESTRICT'
+});
+Turno.hasMany(TurnoProfesor, {
+  foreignKey: 'idTurno',
+  as: 'asignacionesProfesor',
+  onDelete: 'CASCADE'
+});
+TurnoProfesor.belongsTo(Turno, { foreignKey: 'idTurno', as: 'turno' });
+
+// Turnos <-> inscripciones de clientes. Al borrar un cliente se borran sus inscripciones
+// RESTRICT: no se puede borrar un turno con inscripciones
+Turno.hasMany(InscripcionTurno, {
+  foreignKey: 'idTurno',
+  as: 'inscripciones',
+  onDelete: 'RESTRICT'
+});
+InscripcionTurno.belongsTo(Turno, { foreignKey: 'idTurno', as: 'turno', onDelete: 'RESTRICT' });
+InscripcionTurno.belongsTo(Cliente, {
+  foreignKey: 'dniCliente',
+  as: 'cliente',
+  onDelete: 'CASCADE'
+});
+Cliente.hasMany(InscripcionTurno, {
+  foreignKey: 'dniCliente',
+  as: 'inscripcionesTurno',
+  onDelete: 'CASCADE'
+});
+
 module.exports = {
   Profesor,
   Especialidad,
@@ -59,5 +109,9 @@ module.exports = {
   Rutina,
   RutinaEjercicio,
   Cliente,
-  Membresia
+  Membresia,
+  TipoClase,
+  Turno,
+  TurnoProfesor,
+  InscripcionTurno
 };

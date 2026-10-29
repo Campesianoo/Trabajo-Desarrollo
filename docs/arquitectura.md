@@ -46,68 +46,139 @@ flowchart TD
 
 ## Modelo de datos
 
+Diagrama entidad-relación **generado desde el esquema real** de PostgreSQL (se aplican todas las migraciones a una base limpia y se lee el resultado), así que tablas, columnas, tipos y claves coinciden con la base. `FK` es clave foránea, `UK` único y, entre paréntesis, la acción `ON DELETE` (sin acción: `NO ACTION`).
+
 ```mermaid
 erDiagram
-    Usuarios ||--o| clientes : "idUsuario"
-    Usuarios ||--o| Profesores : "dniProfesor"
-    Profesores }o--o{ Especialidades : "ProfesorEspecialidad"
+    clientes |o--o{ InscripcionTurno : "dniCliente (CASCADE)"
+    Turnos ||--o{ InscripcionTurno : "idTurno"
     clientes ||--o{ Membresias : "dniCliente (CASCADE)"
-    clientes ||--o{ Rutinas : "dniCliente (CASCADE)"
-    Profesores ||--o{ Rutinas : "dniProfesor (NO ACTION)"
+    Profesores ||--o{ ProfesorEspecialidad : "dniProfesor (CASCADE)"
+    Especialidades ||--o{ ProfesorEspecialidad : "idEspecialidad (CASCADE)"
     Rutinas ||--o{ RutinaEjercicios : "idRutina (CASCADE)"
+    clientes ||--o{ Rutinas : "dniCliente (CASCADE)"
+    Profesores ||--o{ Rutinas : "dniProfesor"
+    Profesores |o--o{ TurnoProfesores : "dniProfesor"
+    Turnos ||--o{ TurnoProfesores : "idTurno (CASCADE)"
+    TiposClase ||--o{ Turnos : "idClase"
+    Profesores |o--o| Usuarios : "dniProfesor (RESTRICT)"
+    Usuarios ||--o| clientes : "idUsuario (RESTRICT)"
 
-    Usuarios {
-        int id PK
-        string email UK
-        string passwordHash
-        enum rol "admin, profesor, cliente"
-        bool activo
-        int tokenVersion
-        bool debeCambiarPassword
-        int dniProfesor FK
-    }
-    clientes {
-        int dni PK
-        string nombre
-        string apellido
-        string telefono
-        string email
-        bool estado
-        int idUsuario FK
-    }
-    Profesores {
-        int dni PK
-        string nombre
-        string apellido
-        string telefono
-        string email
-    }
     Especialidades {
-        int id PK
-        string nombre
+        integer id PK
+        varchar_255 nombre
+        timestamptz createdAt
+        timestamptz updatedAt
     }
+
+    InscripcionTurno {
+        bigint idInscripcion PK
+        bigint idTurno FK
+        integer dniCliente FK
+        timestamptz fechaHoraInscripcion
+        text estado
+        timestamptz createdAt
+        timestamptz updatedAt
+    }
+
     Membresias {
         bigint idMembresia PK
-        int dniCliente FK
+        integer dniCliente FK
         date fechaPago
         date fechaInicio
         date fechaVencimiento
-        decimal valor
+        numeric_10_2 valor
+        timestamptz createdAt
+        timestamptz updatedAt
     }
-    Rutinas {
-        int idRutina PK
-        string nombreRutina
-        string diaSemana
-        int dniCliente FK
-        int dniProfesor FK
+
+    ProfesorEspecialidad {
+        integer dniProfesor PK,FK
+        integer idEspecialidad PK,FK
     }
+
+    Profesores {
+        integer dni PK
+        varchar_255 nombre
+        varchar_255 apellido
+        varchar_255 telefono
+        varchar_255 email
+        timestamptz createdAt
+        timestamptz updatedAt
+    }
+
     RutinaEjercicios {
-        int id PK
-        int idRutina FK
-        string nombreEjercicio
-        int series
-        string repeticiones
-        int descanso
+        bigint id PK
+        bigint idRutina FK
+        text nombreEjercicio
+        integer series
+        text repeticiones
+        smallint descanso
+        timestamptz createdAt
+        timestamptz updatedAt
+    }
+
+    Rutinas {
+        bigint idRutina PK
+        text nombreRutina
+        text diaSemana
+        integer dniCliente FK
+        integer dniProfesor FK
+        timestamptz createdAt
+        timestamptz updatedAt
+    }
+
+    TiposClase {
+        bigint idClase PK
+        text nombre
+        text descripcion
+        timestamptz createdAt
+        timestamptz updatedAt
+    }
+
+    TurnoProfesores {
+        bigint id PK
+        bigint idTurno FK
+        integer dniProfesor FK
+        timestamptz createdAt
+        timestamptz updatedAt
+    }
+
+    Turnos {
+        bigint idTurno PK
+        bigint idClase FK
+        date fecha
+        time horaInicio
+        time horaFin
+        integer capacidadMaxima
+        text estado
+        timestamptz createdAt
+        timestamptz updatedAt
+    }
+
+    Usuarios {
+        integer id PK
+        varchar_255 email UK
+        varchar_255 passwordHash
+        enum rol
+        boolean activo
+        integer tokenVersion
+        boolean debeCambiarPassword
+        integer dniProfesor FK,UK
+        timestamptz createdAt
+        timestamptz updatedAt
+    }
+
+    clientes {
+        integer dni PK
+        varchar_100 nombre
+        varchar_100 apellido
+        varchar_30 telefono
+        varchar_100 email
+        boolean estado
+        integer idUsuario FK,UK
+        timestamptz createdAt
+        timestamptz updatedAt
     }
 ```
 
@@ -119,6 +190,10 @@ erDiagram
 | un **profesor** sin rutinas | se borra con su cuenta |
 | un **profesor con rutinas** | se rechaza con `409`: las rutinas también son del cliente |
 | una **rutina** | se borran sus ejercicios |
+| un **cliente** con inscripciones | se borran también sus inscripciones |
+| un **profesor asignado a turnos** | se rechaza con `409` |
+| un **tipo de clase con turnos** | se rechaza con `409` |
+| un **turno con inscripciones** | se rechaza con `409` |
 
 ### Lo que no se guarda: el estado de la membresía
 
@@ -134,6 +209,16 @@ flowchart TD
     C -->|no| Ac[Activa]
 ```
 
-### Clases y turnos (en desarrollo)
+### Clases y turnos
 
-Las tablas de clases las está desarrollando otro integrante en su rama: `TiposClase`, `Turnos`, `TurnoProfesores` e `InscripcionTurno`. Cuando se integren se agregan a este diagrama. Ver [migraciones](migraciones.md#ramas-que-agregan-tablas).
+Un **tipo de clase** tiene **turnos**; un turno tiene uno o más **profesores** y recibe **inscripciones** de clientes. Un turno sin fecha es una **plantilla**: el backend genera a partir de ella los turnos de los próximos 30 días.
+
+```mermaid
+flowchart LR
+    P[Plantilla<br/>turno sin fecha] -->|genera cada día| T[Turnos de los próximos 30 días]
+    T --> I{Cliente se inscribe}
+    I -->|"≥ 8 h antes · 1 por día · hay lugar"| OK[Inscripción activa]
+    I -->|no cumple| X[409 con el motivo]
+    OK -->|el día del turno| A[Profesor marca<br/>asistió / ausente]
+    OK -->|el cliente cancela| C[Cancelada<br/>libera el lugar]
+```

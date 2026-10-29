@@ -1,0 +1,64 @@
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
+
+const Turno = sequelize.define(
+  'Turno',
+  {
+    idTurno: {
+      type: DataTypes.BIGINT,
+      primaryKey: true,
+      autoIncrement: true,
+      field: 'idTurno'
+    },
+    idClase: {
+      type: DataTypes.BIGINT,
+      allowNull: false,
+      references: {
+        model: 'TiposClase',
+        key: 'idClase'
+      },
+      field: 'idClase'
+    },
+    fecha: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      field: 'fecha'
+    },
+    horaInicio: {
+      type: DataTypes.TIME,
+      allowNull: true,
+      field: 'horaInicio'
+    },
+    horaFin: {
+      type: DataTypes.TIME,
+      allowNull: true,
+      field: 'horaFin'
+    },
+    capacidadMaxima: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'capacidadMaxima'
+    },
+    idTurnoPlantilla: {
+      type: DataTypes.BIGINT,
+      allowNull: true,
+      references: {
+        model: 'Turnos',
+        key: 'idTurno'
+      },
+      onDelete: 'SET NULL',
+      field: 'idTurnoPlantilla'
+    },
+    estado: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'estado'
+    }
+  },
+  {
+    tableName: 'Turnos',
+    freezeTableName: true
+  }
+);
+
+module.exports = Turno;
