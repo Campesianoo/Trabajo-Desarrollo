@@ -428,6 +428,66 @@ describe('asistencia', () => {
   });
 });
 
+describe('strikes por ausencias', () => {
+  let dani;
+
+  // Turnos pasados con el cliente marcado ausente: se cargan directo en la base
+  const ausenteEl = async (dias) => {
+    const turno = await Turno.create({
+      idClase,
+      fecha: enDias(dias),
+      horaInicio: '10:00',
+      horaFin: '11:00',
+      capacidadMaxima: 5
+    });
+    await InscripcionTurno.create({
+      idTurno: turno.idTurno,
+      dniCliente: 400,
+      fechaHoraInscripcion: new Date(),
+      estado: 'ausente'
+    });
+  };
+
+  beforeAll(async () => {
+    await nuevoCliente(400);
+    await conOrigen(admin.post('/api/membresias')).send({
+      dniCliente: 400,
+      fechaPago: enDias(-40),
+      fechaInicio: enDias(-40),
+      fechaVencimiento: enDias(60),
+      valor: 100
+    });
+    dani = await loguear('cliente400@test.com', '400');
+  });
+
+  it('con dos ausencias todavía puede reservar', async () => {
+    await ausenteEl(-20);
+    await ausenteEl(-10);
+    const { body: turno } = await nuevoTurno({ fecha: enDias(4) });
+    expect((await inscribirse(dani, turno.idTurno)).status).toBe(201);
+    const perfil = await dani.get('/api/clientes/me');
+    expect(perfil.body.strikes).toEqual({ strikes: 2, bloqueadoHasta: null });
+  });
+
+  it('con la tercera ausencia en 30 días no puede reservar por 7 días', async () => {
+    await ausenteEl(-2);
+    const { body: turno } = await nuevoTurno({ fecha: enDias(5) });
+    const res = await inscribirse(dani, turno.idTurno);
+    expect(res.status).toBe(409);
+    expect(res.body.message).toMatch(/3 ausencias/);
+
+    const perfil = await dani.get('/api/clientes/me');
+    expect(perfil.body.strikes).toEqual({ strikes: 3, bloqueadoHasta: enDias(5) });
+  });
+
+  it('el admin y el profesor ven los strikes en el detalle del cliente', async () => {
+    for (const agente of [admin, profe]) {
+      const res = await agente.get('/api/clientes/400');
+      expect(res.body.strikes.strikes).toBe(3);
+    }
+  });
+});
+
 describe('borrados', () => {
   it('no se borra un turno con inscripciones (409)', async () => {
     const { body: turno } = await nuevoTurno({ fecha: enDias(15) });

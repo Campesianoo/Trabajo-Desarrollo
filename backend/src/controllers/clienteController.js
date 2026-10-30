@@ -3,6 +3,7 @@ const { Cliente, Usuario, Membresia } = require('../models/associations');
 const { validatePassword, hashPassword, hashPasswordInicial } = require('../utils/password');
 const { toPositiveInt, isValidEmail, sendError, esErrorDeReferencia } = require('../utils/http');
 const { calcularEstado } = require('../utils/membresia');
+const { strikesDelCliente } = require('./inscripcionTurnoController');
 
 // Todo cliente tiene una cuenta: se trae lo necesario para saber su estado
 const incluirUsuario = {
@@ -132,7 +133,8 @@ const getMiPerfil = async (req, res) => {
       include: incluirUsuario
     });
     if (!cliente) return res.status(404).json({ message: 'No encontrado' });
-    res.json(aRespuesta(cliente));
+    // Sus ausencias recientes y, si las tiene, hasta cuándo no puede reservar
+    res.json({ ...aRespuesta(cliente), strikes: await strikesDelCliente(cliente.dni) });
   } catch (error) {
     sendError(res, 500, 'Error al obtener el perfil', error);
   }
@@ -174,7 +176,7 @@ const getClienteByDni = async (req, res) => {
     const cliente = await Cliente.findByPk(dni, { include: incluirUsuario });
     if (!cliente) return res.status(404).json({ message: 'No encontrado' });
     const [respuesta] = await conMembresia([aRespuesta(cliente)], req.user);
-    res.json(respuesta);
+    res.json({ ...respuesta, strikes: await strikesDelCliente(dni) });
   } catch (error) {
     sendError(res, 500, 'Error al obtener cliente', error);
   }

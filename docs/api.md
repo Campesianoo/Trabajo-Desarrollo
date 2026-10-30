@@ -60,10 +60,10 @@ Un admin no puede borrarse, desactivarse ni quitarse el rol a sí mismo.
 
 | Método | Ruta | Acceso | Body |
 |:-|:-|:-|:-|
-| GET | `/clientes/me` | Cliente | Su propio perfil |
+| GET | `/clientes/me` | Cliente | Su propio perfil (con sus `strikes`) |
 | PUT | `/clientes/me` | Cliente | `{ telefono }` (solo ese campo) |
 | GET | `/clientes` | Admin, profesor | Lista. **Solo para el admin** cada cliente trae `membresia` (ver abajo) |
-| GET | `/clientes/:dni` | Admin, profesor | Un cliente (también con `membresia` para el admin) |
+| GET | `/clientes/:dni` | Admin, profesor | Un cliente con sus `strikes` (y `membresia` para el admin) |
 | POST | `/clientes` | Admin | `{ dni, nombre, apellido, email, telefono?, estado? }`. **Crea también su cuenta** (contraseña inicial: el DNI) |
 | PUT | `/clientes/:dni` | Admin | `{ nombre?, apellido?, telefono?, email?, estado?, activo?, password? }` |
 | DELETE | `/clientes/:dni` | Admin | Borra también membresías, rutinas y cuenta |
@@ -85,6 +85,14 @@ Cada cliente se devuelve así:
 ```
 
 `membresia` es la que está en curso (`Activa` o `Por vencer`); si no hay, la próxima (`Pendiente`); si no, la última (`Vencida`); y `null` si el cliente nunca tuvo una. El campo no existe en la respuesta al profesor.
+
+`GET /clientes/me` y `GET /clientes/:dni` agregan las ausencias del cliente (ver [strikes](#strikes-por-ausencias)):
+
+```json
+"strikes": { "strikes": 3, "bloqueadoHasta": "2026-11-04" }
+```
+
+`strikes` son las ausencias de los últimos 30 días y `bloqueadoHasta` el último día (inclusive) en que no puede reservar, o `null`.
 
 ## Profesores
 
@@ -184,7 +192,8 @@ Un **tipo de clase** (Crossfit, Musculación…) tiene **turnos**: una fecha, un
 | PUT | `/turnos/:id` | Admin | Cualquiera de esos campos |
 | DELETE | `/turnos/:id` | Admin | `409` si tiene inscripciones |
 
-- **Plantillas:** un turno con `fecha: null` es una plantilla. El backend genera a partir de ella los turnos de los próximos 30 días (una vez por día, y cuando se crea o cambia una plantilla). Los turnos ya generados no se tocan si después se edita o borra la plantilla.
+- **Plantillas:** un turno con `fecha: null` es una plantilla. El backend genera a partir de ella los turnos de los próximos 30 días (una vez por día, y cuando se crea o cambia una plantilla). Cada turno generado guarda de qué plantilla salió (`idTurnoPlantilla`).
+- **Editar una serie:** editar la plantilla o cualquiera de sus turnos generados actualiza toda la serie (horario, capacidad, profesores; la fecha de cada turno no cambia). Los turnos de un solo día no se tocan. Si la capacidad nueva queda por debajo de las inscripciones de alguno de los turnos, responde `409` y no cambia nada. Borrar la plantilla no borra los turnos ya generados.
 - **Qué ve cada rol:** el profesor solo recibe los turnos donde está asignado. El cliente recibe en cada turno **solo su propia inscripción**, y no ve las plantillas.
 - **`inscriptos`:** cada turno trae cuántas inscripciones vigentes tiene (las canceladas no cuentan; asistió y ausente sí). Con `capacidadMaxima` se calculan los lugares libres.
 - Horas como `HH:mm` o `HH:mm:ss`; `horaFin` tiene que ser posterior a `horaInicio`. No se puede bajar la capacidad por debajo de las inscripciones vigentes.
@@ -204,5 +213,31 @@ Reglas de la inscripción (todas responden `409` con el motivo):
 - **Un turno por día** por cliente.
 - No se puede superar la **capacidad máxima** (se controla con el turno bloqueado: dos clientes a la vez no pueden pasarse del cupo).
 - No se puede estar inscripto dos veces al mismo turno. Si canceló, puede volver a anotarse.
+- No puede tener las reservas **suspendidas por ausencias** (ver abajo).
 
 La asistencia solo se registra el día del turno o después (`409` si es un turno futuro). Los estados de una inscripción son `activa`, `cancelada`, `asistio` y `ausente`.
+
+### Strikes por ausencias
+
+Cada inscripción marcada como `ausente` es un **strike**. Con **3 ausencias dentro de 30 días**, el cliente no puede reservar durante los **7 días** siguientes a la última de ellas: `POST /turnos/:id/inscripciones` responde `409` "Tenés 3 ausencias en los últimos 30 días: podés volver a reservar desde el DD/MM/AAAA". Cancelar una reserva no suma strikes. Se calcula con las fechas de los turnos (no se guarda), en `utils/strikes.js`. Las reservas que ya tenía no se cancelan.
+
+Si el profesor se equivocó, al volver la inscripción a `activa` o `asistio` el strike desaparece.
+
+## Control de acceso
+
+| Método | Ruta | Acceso | Qué hace |
+|:-|:-|:-|:-|
+| GET | `/acceso/:dni` | Admin | Dice si el cliente puede entrar al gimnasio |
+
+Se usa en la recepción: con el DNI devuelve el cliente, su membresía vigente (o la más reciente) y si puede entrar. Solo **consulta**: no registra el ingreso ni cambia nada.
+
+```json
+{
+  "cliente": { "dni": 40123456, "nombre": "Ana", "apellido": "Gómez", "activo": true },
+  "membresia": { "idMembresia": 7, "fechaInicio": "2026-10-01", "fechaVencimiento": "2026-10-31", "valor": 15000, "estado": "Por vencer" },
+  "puedeEntrar": true,
+  "motivo": null
+}
+```
+
+Puede entrar con la membresía `Activa` o `Por vencer`. Si no, `motivo` explica por qué: cliente dado de baja, sin membresías, membresía vencida o que todavía no empezó. `404` si no existe un cliente con ese DNI.
