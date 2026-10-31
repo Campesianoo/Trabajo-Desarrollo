@@ -18,7 +18,7 @@ Diariamente los clientes ingresan a la aplicación para reservar un turno y real
 El gimnasio también administra las membresías de sus clientes y las rutinas que los profesores les asignan. Cada cliente y cada profesor entra con su propia cuenta, que crea el administrador.
 
 ### Modelo
-https://drive.google.com/file/d/1HqDRPvlI2g2nIOXbl4_dAGp7fi8ul_dJ/view?usp=sharing
+[Modelo de dominio](https://drive.google.com/file/d/1ENHSvaqW32WjgXxIyhOJANdfcfXnSqnA/view?usp=sharing)
 
 ## Alcance Funcional
 
