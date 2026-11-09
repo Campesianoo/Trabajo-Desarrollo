@@ -30,7 +30,7 @@ Regularidad:
 |CRUD simple|1. CRUD Cliente<br>2. CRUD Profesor<br>3. CRUD Especialidad<br>4. CRUD Tipo de Clase|
 |CRUD dependiente|1. CRUD Turno {depende de} CRUD Tipo de Clase y CRUD Profesor<br>2. CRUD Membresía {depende de} CRUD Cliente<br>3. CRUD Rutina {depende de} CRUD Cliente y CRUD Profesor|
 |Listado<br>+<br>detalle|1. Listado de clientes, muestra nombre, DNI y el estado de la membresía (activa, por vencer, vencida o sin membresía) => detalle muestra los datos del cliente y su rutina asignada<br>2. Listado de clases del día filtrado por fecha, muestra clase, horario, profesores y lugares ocupados => detalle muestra los clientes anotados en la clase|
-|CUU/Epic|1. Reservar un turno para realizar una actividad en un determinado día y horario (con una membresía vigente que cubra el día del turno, al menos 8 horas de anticipación, un turno por día y mientras haya cupo)<br>2. Registrar la asistencia del cliente a la clase|
+|CUU/Epic|1. Reservar un turno para realizar una actividad en un determinado día y horario (con una membresía vigente que cubra el día del turno, al menos 8 horas de anticipación, un turno por día, mientras haya cupo y sin reservas suspendidas por ausencias)<br>2. Registrar la asistencia del cliente a la clase (con 3 ausencias en 30 días, el cliente no puede reservar durante 7 días)|
 
 La data registrada por el CUU 1 sirve como input para el CUU 2.
 Para aprobación, la membresía que registra el CUU 3 es la que habilita al cliente a reservar un turno (CUU 1).

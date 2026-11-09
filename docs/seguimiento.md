@@ -13,7 +13,8 @@
 | [#6](https://github.com/Campesianoo/Trabajo-Desarrollo/pull/6) | `fix/revision-backend` | Revisión del backend: migraciones, validaciones, cuenta obligatoria para clientes y profesores | Mergeado |
 | [#7](https://github.com/Campesianoo/Trabajo-Desarrollo/pull/7) | `feature/perfil-cliente` | Perfil del cliente (`/clientes/me`) | Mergeado |
 | [#8](https://github.com/Campesianoo/Trabajo-Desarrollo/pull/8) | `feature/clientes-listado-membresia` | Estado de membresía en el listado de clientes | Mergeado |
-| [#9](https://github.com/Campesianoo/Trabajo-Desarrollo/pull/9) | `feature-Turnos` | Clases, turnos, inscripciones, plantillas diarias y asistencia (con su migración) | En revisión |
+| [#9](https://github.com/Campesianoo/Trabajo-Desarrollo/pull/9) | `feature-Turnos` | Clases, turnos, inscripciones, plantillas diarias y asistencia (con su migración) | Mergeado |
+| [#10](https://github.com/Campesianoo/Trabajo-Desarrollo/pull/10) | `feature/docs-e2e` | Documentación de los tests end-to-end | Mergeado |
 
 ### Frontend – [IanKasperczak/Trabajo-Desarrollo-Frontend](https://github.com/IanKasperczak/Trabajo-Desarrollo-Frontend/pulls?q=is%3Apr)
 
@@ -23,6 +24,17 @@
 | [#2](https://github.com/IanKasperczak/Trabajo-Desarrollo-Frontend/pull/2) | `feature/frontend-pendientes` | Pantallas pendientes (rutinas, usuarios, perfil de profesor), sin datos mock | Mergeado |
 | [#3](https://github.com/IanKasperczak/Trabajo-Desarrollo-Frontend/pull/3) | `feature/perfil-cliente` | Mi Perfil del cliente | Mergeado |
 | [#4](https://github.com/IanKasperczak/Trabajo-Desarrollo-Frontend/pull/4) | `feature/sin-salones` | Se quita Salones; membresías y listado de clientes con estado y detalle | Mergeado |
+| [#5](https://github.com/IanKasperczak/Trabajo-Desarrollo-Frontend/pull/5) | `feature/e2e` | Tests end-to-end con Playwright | Mergeado |
+
+### Cambios subidos directo a `main` (sin PR)
+
+| Fecha | Autor | Repo | Contenido |
+|:-|:-|:-|:-|
+| 27/10 | Matías | Backend y frontend | Las plantillas recuerdan sus turnos generados (`idTurnoPlantilla`, migración `20261027-01`): editar uno actualiza la serie |
+| 28/10 | Matías | Frontend | Historial de pagos de membresía, turnos ordenados por horario, textos de profesores |
+| 29/10 | Bianca | Backend y frontend | Control de acceso por DNI (`GET /api/acceso/:dni` y su pantalla) |
+
+De acá en adelante, todo cambio va por rama y PR.
 
 > Los PR más recientes (tests y documentación) se agregan acá al abrirlos.
 
@@ -46,6 +58,9 @@
 | Tests automáticos (unitarios, de integración y end-to-end) | ✅ | ✅ |
 | Documentación | ✅ | ✅ |
 | Deploy con cuentas de demostración | 🚧 | 🚧 |
+| Historial de pagos de membresía | ✅ | ✅ |
+| Control de acceso al gimnasio | ✅ | ✅ |
+| Strikes por ausencias | ✅ | ✅ |
 | Video de demostración | ⏳ | |
 
 ✅ hecho · 🚧 en curso · ⏳ pendiente
@@ -65,5 +80,4 @@
 
 ## Pendientes conocidos
 
-- Actualizar la propuesta (`proposal.md`): quitar Salón y la sección de adicionales heredada de otra plantilla.
 - Revisar las vulnerabilidades que reporta `npm audit` en el frontend.

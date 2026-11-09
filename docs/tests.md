@@ -4,8 +4,8 @@ Los dos repositorios usan [Vitest](https://vitest.dev). Última ejecución compl
 
 | Repo | Archivos | Tests | Resultado |
 |:-|:-:|:-:|:-:|
-| Backend | 8 | 112 | ✅ 112 pasaron |
-| Frontend | 7 | 46 | ✅ 46 pasaron |
+| Backend | 9 | 124 | ✅ 124 pasaron |
+| Frontend | 8 | 52 | ✅ 52 pasaron |
 
 ## Cómo correrlos
 
@@ -33,6 +33,7 @@ Usa [supertest](https://github.com/ladjs/supertest) para llamar a la API real (l
 | `membresia.test.js` | `fechaValida` (rechaza `2026-02-30`, años no bisiestos, formatos raros), `valorValido` (rangos, redondeo a 2 decimales), `calcularEstado` (Pendiente / Activa / Por vencer / Vencida, incluidos los bordes) |
 | `password.test.js` | Largo mínimo y máximo, hash y verificación, usuario inexistente |
 | `renovacion.test.js` | Suma de días y fechas de la renovación (sin membresías, al día, vence hoy, vencida) |
+| `strikes.test.js` | Strikes por ausencias: dos no bloquean, la tercera en 30 días bloquea 7 días (incluido el último), ausencias separadas por más de 30 días o viejas no cuentan, orden de las fechas |
 
 ### Integración (`backend/tests/integration`)
 
@@ -41,7 +42,7 @@ Usa [supertest](https://github.com/ladjs/supertest) para llamar a la API real (l
 | `auth.test.js` | Login correcto (cookie `httpOnly`), mismo `401` para email inexistente y contraseña incorrecta, `/auth/me` sin y con sesión, rechazo de un origen no permitido (CSRF), logout |
 | `clientes-membresias.test.js` | Alta de cliente (crea la cuenta con contraseña = DNI), DNI repetido `409`, email inválido `400`, permisos por rol (`403`), estado de la membresía según las fechas, el profesor no ve membresías, el cliente solo ve las suyas, listado de clientes con `membresia` (y sin ese campo para el profesor), borrado en cascada |
 | `renovacion.test.js` | Renovar membresía: la propuesta (primera vez, al día, vencida), alta con importe, encadenado sin huecos ni superposiciones, validaciones, permisos (`403`) y que después de renovar el cliente pueda reservar |
-| `turnos.test.js` | Tipos de clase y turnos (validaciones y permisos), plantillas que generan 30 días sin duplicarse, inscripción (membresía que cubra el día del turno, cupo, 8 horas de anticipación, un turno por día, sin duplicados, cancelar y volver a anotarse), qué ve cada rol, registro de asistencia (profesor del turno, estados válidos, turno futuro) y reglas de borrado |
+| `turnos.test.js` | Tipos de clase y turnos (validaciones y permisos), plantillas que generan 30 días sin duplicarse, inscripción (membresía que cubra el día del turno, cupo, 8 horas de anticipación, un turno por día, sin duplicados, cancelar y volver a anotarse), qué ve cada rol, registro de asistencia (profesor del turno, estados válidos, turno futuro), edición de una serie de turnos desde la plantilla o desde un turno generado, strikes (con 3 ausencias en 30 días no puede reservar; el admin, el profesor y el propio cliente ven los strikes) y reglas de borrado |
 
 ## Frontend
 
@@ -53,8 +54,9 @@ Usa [supertest](https://github.com/ladjs/supertest) para llamar a la API real (l
 | `src/components/auth/ProtectedRoute.test.tsx` | Deja pasar al rol permitido, manda al login sin sesión, redirige a un cliente que intenta entrar a `/admin`, no muestra nada mientras se restaura la sesión |
 | `src/components/cliente/ClienteCard.test.tsx` | Muestra el estado de membresía y su vencimiento, "Sin membresía", no muestra membresía en la vista del profesor, aviso de contraseña inicial, botón "Ver detalle" |
 | `src/context/ColorModeProvider.test.tsx` | Tema claro por defecto, aplica y guarda el modo oscuro, recuerda la elección, ignora valores inválidos |
-| `src/utils/turno.test.ts` | Formato de horas y días, lugares libres y turno completo, inscripción vigente, horas que faltan para el inicio, membresía que cubre el día |
+| `src/utils/turno.test.ts` | Formato de horas y días, lugares libres y turno completo, inscripción vigente, horas que faltan para el inicio, membresía que cubre el día, texto de los strikes (para el cliente y para el admin) |
 | `src/components/membresia/RenovarMembresiaDialog.test.tsx` | Muestra las fechas calculadas y el último importe, registra el pago, exige el importe la primera vez, rechaza importes inválidos y muestra el error si falla |
+| `src/components/membresia/HistorialPagosDialog.test.tsx` | Historial de pagos del cliente del más reciente al más antiguo, cerrar el diálogo y abrirlo desde la tarjeta |
 | `src/components/turno/TurnoCard.test.tsx` | Horario, clase, profesor y lugares; turno completo; sin profesor; plantilla "Todos los días"; acciones |
 
 ## Test end-to-end (frontend)
@@ -105,12 +107,12 @@ Salida resumida de la última ejecución:
 
 ```text
 Backend
- Test Files  8 passed (8)
-      Tests  112 passed (112)
+ Test Files  9 passed (9)
+      Tests  124 passed (124)
 
 Frontend (vitest)
- Test Files  7 passed (7)
-      Tests  46 passed (46)
+ Test Files  8 passed (8)
+      Tests  52 passed (52)
 
 Frontend (Playwright, e2e)
   5 passed

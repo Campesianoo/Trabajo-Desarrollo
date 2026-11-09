@@ -84,3 +84,19 @@ Los tests del backend corren con `NODE_ENV=test`, que reemplaza la conexión por
 **Reglas:** empieza al día siguiente del vencimiento si la última sigue al día y, si no, hoy; dura 30 días; repite el último importe. Se bloquea al cliente mientras se calcula, para que dos renovaciones simultáneas no se superpongan (con SQLite en los tests no se puede probar la concurrencia: se verificó contra PostgreSQL).
 
 **Relación con los otros casos de uso:** la membresía que registra este caso de uso es la que habilita `Reservar turno`, y la reserva alimenta el registro de asistencia.
+
+## 13. Strikes por ausencias
+
+**Decisión:** cada ausencia a un turno reservado es un strike. Con 3 dentro de 30 días, el cliente no puede reservar durante los 7 días siguientes a la última. Cancelar no suma strikes.
+
+**Por qué:** si un cliente reserva y no va, ocupa un lugar que otro podría haber usado, y el cupo es limitado. Cancelar libera el lugar, por eso no se penaliza.
+
+**Cómo:** no se agregó ninguna tabla. Los strikes se cuentan a partir de las inscripciones en estado `ausente` y la fecha de su turno (`utils/strikes.js`), como el estado de la membresía. Así, si el profesor se equivoca y corrige la asistencia, el strike desaparece solo. El bloqueo lo controla el backend al inscribirse (`409`); el frontend lo muestra antes en Reservar Clase y en el detalle del cliente. Las reservas que ya tenía no se cancelan.
+
+**Asistencia y membresía vencida:** al registrar la asistencia no se vuelve a pedir la membresía, porque ya se exigió al reservar una que cubra el día del turno.
+
+## 14. El control de acceso solo consulta
+
+**Decisión:** la pantalla de control de acceso (`GET /acceso/:dni`) le dice al admin si un cliente puede entrar según su membresía, pero no registra el ingreso.
+
+**Por qué:** la asistencia a las clases ya se registra sobre la inscripción (decisión 11). Guardar además cada ingreso al gimnasio sería un registro paralelo que no se usa en ninguna parte.

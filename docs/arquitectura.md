@@ -61,6 +61,7 @@ erDiagram
     Profesores |o--o{ TurnoProfesores : "dniProfesor"
     Turnos ||--o{ TurnoProfesores : "idTurno (CASCADE)"
     TiposClase ||--o{ Turnos : "idClase"
+    Turnos |o--o{ Turnos : "idTurnoPlantilla (SET NULL)"
     Profesores |o--o| Usuarios : "dniProfesor (RESTRICT)"
     Usuarios ||--o| clientes : "idUsuario (RESTRICT)"
 
@@ -152,6 +153,7 @@ erDiagram
         time horaFin
         integer capacidadMaxima
         text estado
+        bigint idTurnoPlantilla FK
         timestamptz createdAt
         timestamptz updatedAt
     }
@@ -211,14 +213,17 @@ flowchart TD
 
 ### Clases y turnos
 
-Un **tipo de clase** tiene **turnos**; un turno tiene uno o más **profesores** y recibe **inscripciones** de clientes. Un turno sin fecha es una **plantilla**: el backend genera a partir de ella los turnos de los próximos 30 días.
+Un **tipo de clase** tiene **turnos**; un turno tiene uno o más **profesores** y recibe **inscripciones** de clientes. Un turno sin fecha es una **plantilla**: el backend genera a partir de ella los turnos de los próximos 30 días, y cada turno generado recuerda su plantilla (`idTurnoPlantilla`) para que editar uno actualice toda la serie.
 
 ```mermaid
 flowchart LR
     P[Plantilla<br/>turno sin fecha] -->|genera cada día| T[Turnos de los próximos 30 días]
     T --> I{Cliente se inscribe}
-    I -->|"≥ 8 h antes · 1 por día · hay lugar"| OK[Inscripción activa]
+    I -->|"membresía que cubre el día · ≥ 8 h antes · 1 por día · hay lugar · sin bloqueo por ausencias"| OK[Inscripción activa]
     I -->|no cumple| X[409 con el motivo]
     OK -->|el día del turno| A[Profesor marca<br/>asistió / ausente]
     OK -->|el cliente cancela| C[Cancelada<br/>libera el lugar]
+    A -->|"3 ausencias en 30 días"| B[7 días sin poder reservar]
 ```
+
+Los **strikes** tampoco se guardan: se cuentan las inscripciones `ausente` de los turnos recientes (`utils/strikes.js`), igual que el estado de la membresía se calcula de sus fechas.

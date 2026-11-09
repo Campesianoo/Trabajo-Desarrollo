@@ -16,7 +16,7 @@ El proyecto son **dos repositorios** independientes que se comunican por una API
 | [Instalación](instalacion.md) | Cómo levantar el backend y el frontend en local, variables de entorno, base de datos |
 | [Arquitectura](arquitectura.md) | Capas, diagramas (Mermaid), modelo de datos (ER) |
 | [API](api.md) | Referencia de todos los endpoints, roles y errores |
-| [Decisiones de diseño](decisiones.md) | Por qué se hizo cada cosa (contraseña inicial = DNI, JWT en cookie, migraciones, etc.) |
+| [Decisiones de diseño](decisiones.md) | Por qué se hizo cada cosa (contraseña inicial = DNI, JWT en cookie, migraciones, strikes, etc.) |
 | [Migraciones](migraciones.md) | Cómo cambiar el esquema de la base, y la regla para ramas que agregan tablas |
 | [Tests](tests.md) | Cómo correr los tests automáticos y evidencia de su ejecución |
 | [Seguimiento](seguimiento.md) | Pull requests, features, bugs e issues |
@@ -31,8 +31,11 @@ El proyecto son **dos repositorios** independientes que se comunican por una API
 | CRUD Cliente, Profesor, Especialidad | Hecho |
 | CRUD dependiente: Membresía (de Cliente), Rutina (de Cliente y Profesor) | Hecho |
 | Listado de clientes con estado de membresía + detalle con su rutina | Hecho |
-| Clases (tipos de clase, turnos, inscripciones) y "Clases del día" con detalle de inscriptos | Hecho (PR #9) |
-| CUU: reservar turno para una actividad / registrar asistencia | Hecho (PR #9) |
+| Clases (tipos de clase, turnos, inscripciones) y "Clases del día" con detalle de inscriptos | Hecho |
+| CUU: reservar turno para una actividad / registrar asistencia | Hecho |
 | CUU: renovar membresía (el sistema calcula las fechas y el admin registra el pago) | Hecho |
+| Historial de pagos de membresía | Hecho |
+| Strikes: con 3 ausencias en 30 días no se puede reservar por 7 días | Hecho |
+| Control de acceso al gimnasio por DNI (admin) | Hecho |
 
 El grupo pasó de 4 a 3 integrantes, por eso se quitó la entidad **Salón** del alcance (ver [decisiones](decisiones.md#8-se-quita-salón-del-alcance)).

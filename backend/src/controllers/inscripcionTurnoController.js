@@ -16,6 +16,42 @@ const {
   ESTADOS_ASISTENCIA,
   estadoVigente: estadoActivoWhere
 } = require('./turnoController');
+const { sumarDias } = require('../utils/membresia');
+const {
+  calcularStrikes,
+  STRIKES_PARA_BLOQUEO,
+  VENTANA_STRIKES_DIAS,
+  DIAS_BLOQUEO
+} = require('../utils/strikes');
+
+const ESTADO_AUSENTE = 'ausente';
+
+// YYYY-MM-DD -> DD/MM/YYYY para los mensajes
+const fechaLegible = (fecha) => fecha.split('-').reverse().join('/');
+
+// Strikes del cliente (ausencias). Solo se traen las que todavía pueden pesar: las de la ventana
+// de 30 días de una ausencia que bloquee hasta hoy o después
+const strikesDelCliente = async (dniCliente, transaction) => {
+  const fechaHoy = fechaBuenosAires();
+  const ausencias = await InscripcionTurno.findAll({
+    where: { dniCliente, estado: ESTADO_AUSENTE },
+    attributes: ['idInscripcion'],
+    include: [
+      {
+        model: Turno,
+        as: 'turno',
+        where: { fecha: { [Op.gte]: sumarDias(fechaHoy, -(VENTANA_STRIKES_DIAS + DIAS_BLOQUEO)) } },
+        attributes: ['fecha'],
+        required: true
+      }
+    ],
+    transaction
+  });
+  return calcularStrikes(
+    ausencias.map((a) => a.turno.fecha),
+    fechaHoy
+  );
+};
 
 const inscribirse = async (req, res) => {
   try {
@@ -57,6 +93,17 @@ const inscribirse = async (req, res) => {
       if (!cliente) {
         const error = new Error('Cliente no encontrado');
         error.status = 404;
+        throw error;
+      }
+
+      // Con 3 ausencias en 30 días no puede reservar por 7 días
+      const { bloqueadoHasta } = await strikesDelCliente(dniCliente, transaction);
+      if (bloqueadoHasta) {
+        const error = new Error(
+          `Tenés ${STRIKES_PARA_BLOQUEO} ausencias en los últimos ${VENTANA_STRIKES_DIAS} días: ` +
+            `podés volver a reservar desde el ${fechaLegible(sumarDias(bloqueadoHasta, 1))}`
+        );
+        error.status = 409;
         throw error;
       }
 
@@ -212,4 +259,4 @@ const registrarAsistencia = async (req, res) => {
   }
 };
 
-module.exports = { inscribirse, cancelarInscripcion, registrarAsistencia };
+module.exports = { inscribirse, cancelarInscripcion, registrarAsistencia, strikesDelCliente };
