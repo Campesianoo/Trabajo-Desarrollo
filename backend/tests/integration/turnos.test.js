@@ -34,12 +34,21 @@ const nuevoProfesor = (dni) =>
     email: `profe${dni}@test.com`
   });
 
+// Un profesor no puede tener dos turnos superpuestos, así que cada turno por defecto va en su
+// propia franja de 5 minutos desde las 19:00 (después de los horarios fijos que usan los tests)
+let franja = 0;
+const siguienteFranja = () => {
+  const minutos = 19 * 60 + 5 * franja++;
+  const hora = (m) =>
+    `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  return { horaInicio: hora(minutos), horaFin: hora(minutos + 5) };
+};
+
 const nuevoTurno = (datos) =>
   conOrigen(admin.post('/api/turnos')).send({
     idClase,
     fecha: enDias(3),
-    horaInicio: '10:00',
-    horaFin: '11:00',
+    ...siguienteFranja(),
     capacidadMaxima: 5,
     dniProfesores: [500],
     ...datos
@@ -485,6 +494,61 @@ describe('strikes por ausencias', () => {
       const res = await agente.get('/api/clientes/400');
       expect(res.body.strikes.strikes).toBe(3);
     }
+  });
+});
+
+describe('un profesor no da dos clases a la vez', () => {
+  let ocho;
+  let nueve;
+
+  it('no se le asigna un turno que se superpone con otro del mismo día (409)', async () => {
+    ocho = (await nuevoTurno({ fecha: enDias(25), horaInicio: '08:00', horaFin: '09:00' })).body;
+    const res = await nuevoTurno({ fecha: enDias(25), horaInicio: '08:30', horaFin: '09:30' });
+    expect(res.status).toBe(409);
+    expect(res.body.message).toContain('Pro Fesor500');
+    expect(res.body.message).toContain('de 08:00 a 09:00');
+  });
+
+  it('otro profesor sí puede dar clase en ese horario', async () => {
+    const res = await nuevoTurno({
+      fecha: enDias(25),
+      horaInicio: '08:30',
+      horaFin: '09:30',
+      dniProfesores: [600]
+    });
+    expect(res.status).toBe(201);
+  });
+
+  it('un turno puede empezar justo cuando termina el otro', async () => {
+    const res = await nuevoTurno({ fecha: enDias(25), horaInicio: '09:00', horaFin: '10:00' });
+    expect(res.status).toBe(201);
+    nueve = res.body;
+  });
+
+  it('un turno de un día choca con las plantillas del profesor (se repiten todos los días)', async () => {
+    // El profesor 600 tiene una plantilla de 07:00 a 08:00
+    const res = await nuevoTurno({
+      fecha: enDias(26),
+      horaInicio: '07:30',
+      horaFin: '08:30',
+      dniProfesores: [600]
+    });
+    expect(res.status).toBe(409);
+    expect(res.body.message).toContain('todos los días');
+  });
+
+  it('una plantilla choca con los turnos futuros del profesor', async () => {
+    const res = await nuevoTurno({ fecha: null, horaInicio: '08:15', horaFin: '08:45' });
+    expect(res.status).toBe(409);
+  });
+
+  it('al editar se controla el nuevo horario y los nuevos profesores', async () => {
+    const editar = (turno, datos) =>
+      conOrigen(admin.put(`/api/turnos/${turno.idTurno}`)).send(datos);
+    expect((await editar(nueve, { horaInicio: '08:30' })).status).toBe(409);
+    expect((await editar(ocho, { dniProfesores: [600] })).status).toBe(409);
+    // Un cambio que no toca la agenda no se controla
+    expect((await editar(ocho, { capacidadMaxima: 7 })).status).toBe(200);
   });
 });
 

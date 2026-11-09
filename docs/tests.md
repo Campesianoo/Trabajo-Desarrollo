@@ -4,7 +4,7 @@ Los dos repositorios usan [Vitest](https://vitest.dev). Última ejecución compl
 
 | Repo | Archivos | Tests | Resultado |
 |:-|:-:|:-:|:-:|
-| Backend | 9 | 124 | ✅ 124 pasaron |
+| Backend | 9 | 130 | ✅ 130 pasaron |
 | Frontend | 8 | 52 | ✅ 52 pasaron |
 
 ## Cómo correrlos
@@ -42,7 +42,7 @@ Usa [supertest](https://github.com/ladjs/supertest) para llamar a la API real (l
 | `auth.test.js` | Login correcto (cookie `httpOnly`), mismo `401` para email inexistente y contraseña incorrecta, `/auth/me` sin y con sesión, rechazo de un origen no permitido (CSRF), logout |
 | `clientes-membresias.test.js` | Alta de cliente (crea la cuenta con contraseña = DNI), DNI repetido `409`, email inválido `400`, permisos por rol (`403`), estado de la membresía según las fechas, el profesor no ve membresías, el cliente solo ve las suyas, listado de clientes con `membresia` (y sin ese campo para el profesor), borrado en cascada |
 | `renovacion.test.js` | Renovar membresía: la propuesta (primera vez, al día, vencida), alta con importe, encadenado sin huecos ni superposiciones, validaciones, permisos (`403`) y que después de renovar el cliente pueda reservar |
-| `turnos.test.js` | Tipos de clase y turnos (validaciones y permisos), plantillas que generan 30 días sin duplicarse, inscripción (membresía que cubra el día del turno, cupo, 8 horas de anticipación, un turno por día, sin duplicados, cancelar y volver a anotarse), qué ve cada rol, registro de asistencia (profesor del turno, estados válidos, turno futuro), edición de una serie de turnos desde la plantilla o desde un turno generado, strikes (con 3 ausencias en 30 días no puede reservar; el admin, el profesor y el propio cliente ven los strikes) y reglas de borrado |
+| `turnos.test.js` | Tipos de clase y turnos (validaciones y permisos), plantillas que generan 30 días sin duplicarse, inscripción (membresía que cubra el día del turno, cupo, 8 horas de anticipación, un turno por día, sin duplicados, cancelar y volver a anotarse), qué ve cada rol, registro de asistencia (profesor del turno, estados válidos, turno futuro), edición de una serie de turnos desde la plantilla o desde un turno generado, strikes (con 3 ausencias en 30 días no puede reservar; el admin, el profesor y el propio cliente ven los strikes), un profesor sin turnos superpuestos (mismo día, contra plantillas, al editar) y reglas de borrado |
 
 ## Frontend
 
@@ -108,7 +108,7 @@ Salida resumida de la última ejecución:
 ```text
 Backend
  Test Files  9 passed (9)
-      Tests  124 passed (124)
+      Tests  130 passed (130)
 
 Frontend (vitest)
  Test Files  8 passed (8)
