@@ -197,6 +197,7 @@ Un **tipo de clase** (Crossfit, Musculación…) tiene **turnos**: una fecha, un
 - **Qué ve cada rol:** el profesor solo recibe los turnos donde está asignado. El cliente recibe en cada turno **solo su propia inscripción**, y no ve las plantillas.
 - **`inscriptos`:** cada turno trae cuántas inscripciones vigentes tiene (las canceladas no cuentan; asistió y ausente sí). Con `capacidadMaxima` se calculan los lugares libres.
 - Horas como `HH:mm` o `HH:mm:ss`; `horaFin` tiene que ser posterior a `horaInicio`. No se puede bajar la capacidad por debajo de las inscripciones vigentes.
+- **Un profesor no da dos clases a la vez:** crear o editar un turno responde `409` si alguno de sus profesores ya tiene otro turno que se superpone, por ejemplo "Juan Pérez ya da Crossfit el 20/11/2026 de 08:00 a 09:00". Un turno de un día se compara con los de esa fecha y con las plantillas ("todos los días"); una plantilla, con las otras plantillas y con los turnos de hoy en adelante. Un turno puede empezar justo cuando termina otro. Al editar solo se controla si cambian los profesores, el horario o la fecha.
 
 ### Inscripciones
 

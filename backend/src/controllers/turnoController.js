@@ -324,6 +324,48 @@ const parseDniProfesores = async (dniProfesores) => {
   return { values };
 };
 
+// Un profesor no puede dar dos clases que se superpongan. Para un turno de un día se miran los
+// turnos de esa fecha y las plantillas (que se repiten todos los días); para una plantilla, las
+// otras plantillas y los turnos de hoy en adelante. Devuelve el mensaje del choque o null
+const buscarChoqueDeProfesor = async (
+  { dniProfesores, fecha, horaInicio, horaFin, excluirIds },
+  transaction
+) => {
+  if (!dniProfesores.length) return null;
+  const choque = await TurnoProfesor.findOne({
+    where: { dniProfesor: { [Op.in]: dniProfesores } },
+    include: [
+      {
+        model: Turno,
+        as: 'turno',
+        required: true,
+        where: {
+          idTurno: { [Op.notIn]: excluirIds },
+          horaInicio: { [Op.lt]: horaFin },
+          horaFin: { [Op.gt]: horaInicio },
+          [Op.or]: [
+            { fecha: null },
+            fecha === null ? { fecha: { [Op.gte]: fechaBuenosAires() } } : { fecha }
+          ]
+        },
+        include: [{ model: TipoClase, as: 'tipoClase', attributes: ['nombre'] }]
+      }
+    ],
+    transaction
+  });
+  if (!choque) return null;
+
+  const profesor = await Profesor.findByPk(choque.dniProfesor, {
+    attributes: ['nombre', 'apellido'],
+    transaction
+  });
+  const { turno } = choque;
+  const cuando =
+    turno.fecha === null ? 'todos los días' : `el ${turno.fecha.split('-').reverse().join('/')}`;
+  const horario = `de ${String(turno.horaInicio).slice(0, 5)} a ${String(turno.horaFin).slice(0, 5)}`;
+  return `${profesor.nombre} ${profesor.apellido} ya da ${turno.tipoClase?.nombre ?? 'otra clase'} ${cuando} ${horario}`;
+};
+
 const vincularTurnosGeneradosExistentes = async (plantilla, transaction) => {
   const fechaInicio = fechaBuenosAires();
   const fechaFin = sumarDias(fechaInicio, DIAS_GENERACION - 1);
@@ -469,6 +511,15 @@ const createTurno = async (req, res) => {
     const tipo = await TipoClase.findByPk(parsed.values.idClase);
     if (!tipo) return res.status(400).json({ message: 'Tipo de clase no encontrado' });
 
+    const choque = await buscarChoqueDeProfesor({
+      dniProfesores: profesoresParsed.values ?? [],
+      fecha: parsed.values.fecha,
+      horaInicio: parsed.values.horaInicio,
+      horaFin: parsed.values.horaFin,
+      excluirIds: [0]
+    });
+    if (choque) return res.status(409).json({ message: choque });
+
     const turno = await sequelize.transaction(async (transaction) => {
       const nuevoTurno = await Turno.create(parsed.values, { transaction });
       if (profesoresParsed.values?.length) {
@@ -520,7 +571,13 @@ const updateTurno = async (req, res) => {
       return res.status(400).json({ message: 'horaFin debe ser posterior a horaInicio' });
     }
     const capacidad = parsed.values.capacidadMaxima ?? plantilla.capacidadMaxima;
+    const cambiaLaAgenda =
+      profesoresParsed.values !== null ||
+      parsed.values.horaInicio !== undefined ||
+      parsed.values.horaFin !== undefined ||
+      parsed.values.fecha !== undefined;
     let capacidadInvalida = false;
+    let choque = null;
     await sequelize.transaction(async (transaction) => {
       let idsActualizados = [idTurno];
       let valoresActualizados = parsed.values;
@@ -536,6 +593,33 @@ const updateTurno = async (req, res) => {
         idsActualizados = [idTurnoPlantilla, ...generados.map(({ idTurno: id }) => Number(id))];
         valoresActualizados = { ...parsed.values };
         delete valoresActualizados.fecha;
+      }
+
+      if (cambiaLaAgenda) {
+        const dniProfesores =
+          profesoresParsed.values ??
+          (
+            await TurnoProfesor.findAll({
+              where: { idTurno },
+              attributes: ['dniProfesor'],
+              transaction
+            })
+          ).map(({ dniProfesor }) => dniProfesor);
+        choque = await buscarChoqueDeProfesor(
+          {
+            dniProfesores,
+            fecha: esRecurrente
+              ? null
+              : parsed.values.fecha !== undefined
+                ? parsed.values.fecha
+                : turno.fecha,
+            horaInicio,
+            horaFin,
+            excluirIds: idsActualizados
+          },
+          transaction
+        );
+        if (choque) return;
       }
 
       if (capacidad !== null) {
@@ -582,6 +666,7 @@ const updateTurno = async (req, res) => {
         }
       }
     });
+    if (choque) return res.status(409).json({ message: choque });
     if (capacidadInvalida) {
       return res.status(409).json({
         message: 'La capacidad máxima no puede ser menor que las inscripciones vigentes'

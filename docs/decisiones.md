@@ -100,3 +100,9 @@ Los tests del backend corren con `NODE_ENV=test`, que reemplaza la conexión por
 **Decisión:** la pantalla de control de acceso (`GET /acceso/:dni`) le dice al admin si un cliente puede entrar según su membresía, pero no registra el ingreso.
 
 **Por qué:** la asistencia a las clases ya se registra sobre la inscripción (decisión 11). Guardar además cada ingreso al gimnasio sería un registro paralelo que no se usa en ninguna parte.
+
+## 15. Un profesor no puede tener dos turnos superpuestos
+
+**Decisión:** al crear o editar un turno, el backend rechaza (`409`) asignarle a un profesor un horario que se pisa con otro turno suyo. Las plantillas cuentan como turnos de todos los días.
+
+**Por qué:** un profesor no puede dar dos clases a la vez, y si se lo asignaba igual el cliente veía al mismo profesor en dos clases a la misma hora. Que un turno empiece cuando termina otro está permitido. Al editar solo se controla si cambia la agenda (profesores, horario o fecha), así un cambio de capacidad no queda trabado por superposiciones cargadas antes de esta regla.
